@@ -45,6 +45,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // One store per merchant — the whole dashboard assumes stores[0].
+    // A double-submit must not create a duplicate.
+    const existingStore = await prisma.store.findFirst({
+      where: { ownerId: session.user.id },
+    });
+    if (existingStore) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "STORE_EXISTS",
+          error: "You already have a store.",
+          data: existingStore,
+        },
+        { status: 409 }
+      );
+    }
+
     const baseSlug = slugify(parsed.data.name);
 
     const createData = {
