@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronUp, Image as ImageIcon, Loader2 } from "lucide-react";
 import { formatPrice, isHttpUrl } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export default function MenuManagementPage() {
   const [uncategorized, setUncategorized] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [noStore, setNoStore] = useState(false);
   
   // Modal states
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -54,6 +56,10 @@ export default function MenuManagementPage() {
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         setStoreId(data.data[0].id);
+      } else {
+        // No store yet — stop the spinner and show the create-store pointer
+        setNoStore(true);
+        setLoading(false);
       }
     }
     init();
@@ -134,6 +140,18 @@ export default function MenuManagementPage() {
     }
   }
 
+  if (noStore) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          You don&apos;t have a store yet — create one to start building your menu.
+        </p>
+        <Link href="/dashboard/settings" className="rounded-xl gradient-primary px-5 py-2.5 text-sm font-bold text-white">
+          Create your store
+        </Link>
+      </div>
+    );
+  }
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" /></div>;
 
   return (
@@ -185,14 +203,16 @@ export default function MenuManagementPage() {
                       )}
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
-                      <button 
+                      <button
                         onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
+                        aria-label={`Edit ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => deleteItem(item.id)}
+                        aria-label={`Delete ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--color-text-muted)] hover:text-red-500 transition-all"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -212,8 +232,9 @@ export default function MenuManagementPage() {
                       <span className="text-[10px] font-medium uppercase tracking-tighter text-[var(--color-text-muted)]">
                         {item.isAvailable ? "Available" : "Sold Out"}
                       </span>
-                      <button 
+                      <button
                         onClick={() => toggleAvailability(item.id, item.isAvailable)}
+                        aria-label={item.isAvailable ? `Mark ${item.name} as sold out` : `Mark ${item.name} as available`}
                         className={`w-10 h-5 rounded-full relative transition-all ${item.isAvailable ? "gradient-primary" : "bg-gray-600"}`}
                       >
                         <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${item.isAvailable ? "right-1" : "left-1"}`} />
@@ -252,14 +273,16 @@ export default function MenuManagementPage() {
                       )}
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
-                      <button 
+                      <button
                         onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
+                        aria-label={`Edit ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => deleteItem(item.id)}
+                        aria-label={`Delete ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--color-text-muted)] hover:text-red-500 transition-all"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -269,8 +292,9 @@ export default function MenuManagementPage() {
                   <h3 className="font-semibold">{item.name}</h3>
                    <div className="mt-4 flex items-center justify-between">
                     <span className="text-sm font-bold text-[var(--color-primary)]">{formatPrice(item.price)}</span>
-                    <button 
+                    <button
                       onClick={() => toggleAvailability(item.id, item.isAvailable)}
+                      aria-label={item.isAvailable ? `Mark ${item.name} as sold out` : `Mark ${item.name} as available`}
                       className={`w-10 h-5 rounded-full relative transition-all ${item.isAvailable ? "gradient-primary" : "bg-gray-600"}`}
                     >
                       <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${item.isAvailable ? "right-1" : "left-1"}`} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Search, Filter, Calendar, ChevronRight, ChevronDown, CheckCircle2, XCircle, Clock, Package, MessageSquare } from "lucide-react";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [noStore, setNoStore] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
@@ -40,6 +42,10 @@ export default function OrderHistoryPage() {
         const data = await res.json();
         if (data.success && data.data.length > 0) {
           setStoreId(data.data[0].id);
+        } else {
+          // No store yet — stop the spinner and show the create-store pointer
+          setNoStore(true);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Failed to fetch store:", error);
@@ -92,6 +98,18 @@ export default function OrderHistoryPage() {
     }
   }
 
+  if (noStore) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          You don&apos;t have a store yet — orders will appear here once your store is live.
+        </p>
+        <Link href="/dashboard/settings" className="rounded-xl gradient-primary px-5 py-2.5 text-sm font-bold text-white">
+          Create your store
+        </Link>
+      </div>
+    );
+  }
   if (loading) return <div className="flex h-64 items-center justify-center animate-pulse-glow">Loading History...</div>;
 
   return (
