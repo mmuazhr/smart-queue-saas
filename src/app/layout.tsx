@@ -11,8 +11,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Smart Queue — No More Waiting in Line",
-    template: "%s | Smart Queue",
+    default: "QueLess — No More Waiting in Line",
+    template: "%s | QueLess",
   },
   description:
     "Digital queue and ordering system for food stalls, food trucks, and small vendors. Scan, order, pay, and get notified — no app install needed.",
@@ -24,12 +24,12 @@ export const metadata: Metadata = {
     "smart queue",
     "Malaysia",
   ],
-  authors: [{ name: "Smart Queue" }],
+  authors: [{ name: "QueLess" }],
   openGraph: {
     type: "website",
     locale: "en_MY",
-    siteName: "Smart Queue",
-    title: "Smart Queue — No More Waiting in Line",
+    siteName: "QueLess",
+    title: "QueLess — No More Waiting in Line",
     description:
       "Digital queue and ordering system for food stalls. Scan, order, pay, and get notified.",
   },

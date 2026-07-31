@@ -29,7 +29,7 @@ export default function AuthLayout({
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
-            Smart Queue
+            QueLess
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             Queue & ordering system for food businesses

@@ -85,7 +85,7 @@ export default function DashboardLayout({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <span className="text-lg font-bold" style={{ color: "var(--color-text)" }}>Smart Queue</span>
+          <span className="text-lg font-bold" style={{ color: "var(--color-text)" }}>QueLess</span>
         </div>
 
         {/* Nav Items */}
@@ -141,7 +141,7 @@ export default function DashboardLayout({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <span className="text-sm font-bold">Smart Queue</span>
+          <span className="text-sm font-bold">QueLess</span>
         </div>
         <button
           id="mobile-menu-toggle"
@@ -169,7 +169,7 @@ export default function DashboardLayout({
             }}
           >
             <div className="flex h-14 items-center px-6 border-b" style={{ borderColor: "var(--color-border)" }}>
-              <span className="text-lg font-bold">Smart Queue</span>
+              <span className="text-lg font-bold">QueLess</span>
             </div>
             <nav className="px-3 py-4 space-y-1">
               {navItems.map((item) => {

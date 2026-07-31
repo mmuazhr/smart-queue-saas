@@ -40,7 +40,7 @@ export class StripeProvider implements PaymentProvider {
             currency: params.currency.toLowerCase(),
             product_data: {
               name: `Order #${params.orderId}`,
-              description: "Smart Queue Payment for Store Order",
+              description: "QueLess Payment for Store Order",
             },
             unit_amount: Math.round(params.amount * 100),
           },

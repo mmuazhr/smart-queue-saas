@@ -13,8 +13,8 @@ export default function HomePage() {
       <nav className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white font-black text-sm">SQ</div>
-            <span className="text-lg font-black tracking-tight"><span className="text-[var(--color-primary)]">Smart</span> Queue</span>
+            <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white font-black text-sm">QL</div>
+            <span className="text-lg font-black tracking-tight"><span className="text-[var(--color-primary)]">Que</span>Less</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-bold text-[var(--color-text-secondary)]">
             <a href="#features" className="hover:text-[var(--color-primary)] transition-colors">Features</a>
@@ -39,7 +39,7 @@ export default function HomePage() {
               Tukarkan Barisan Panjang Kepada <span className="text-orange-500">Jualan.</span>
             </h1>
             <p className="text-lg text-[var(--color-text-secondary)] leading-relaxed max-w-lg">
-              Smart Queue is the digital queue & ordering system that lets your customers scan, order, and pay from their phone. No more physical lines, no more missed sales.
+              QueLess is the digital queue & ordering system that lets your customers scan, order, and pay from their phone. No more physical lines, no more missed sales.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/register" className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl gradient-primary text-white font-black tracking-wide whitespace-nowrap shadow-2xl shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all">
@@ -56,7 +56,7 @@ export default function HomePage() {
             <div className="glass rounded-3xl overflow-hidden shadow-2xl border border-white/10 aspect-video lg:aspect-square relative">
               <Image 
                 src="/hero-merchant.png" 
-                alt="Merchant using Smart Queue" 
+                alt="Merchant using QueLess"
                 fill
                 className="object-cover hover:scale-105 transition-all duration-700" 
               />
@@ -135,8 +135,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="space-y-4 max-w-sm">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white font-black text-sm">SQ</div>
-              <span className="text-lg font-black tracking-tight">Smart Queue</span>
+              <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center text-white font-black text-sm">QL</div>
+              <span className="text-lg font-black tracking-tight">QueLess</span>
             </div>
             <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-widest font-bold">Empowering micro food businesses in Malaysia.</p>
           </div>
@@ -149,7 +149,7 @@ export default function HomePage() {
           </div>
 
           <div className="text-[var(--color-text-muted)] text-sm">
-            &copy; 2026 Smart Queue SaaS. All rights reserved.
+            &copy; 2026 QueLess. All rights reserved.
           </div>
         </div>
       </footer>
