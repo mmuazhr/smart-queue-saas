@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
       ...parsed.data,
       slug: baseSlug,
       ownerId: session.user.id,
-      status: "PENDING",
+      // Self-serve onboarding (decided 2026-07-31): stores are live immediately.
+      // Nothing in the product can flip PENDING→ACTIVE, so PENDING was a dead end.
+      status: "ACTIVE",
       operatingHours: (parsed.data.operatingHours as Prisma.InputJsonValue) ?? undefined,
     };
 
