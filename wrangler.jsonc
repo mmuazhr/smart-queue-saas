@@ -16,6 +16,10 @@
   ],
   "images": {
     "binding": "IMAGES"
+  },
+  "vars": {
+    "NEXTJS_ENV": "production",
+    "AUTH_TRUST_HOST": "true"
   }
   // TODO: create the Hyperdrive config against the production Supabase direct
   // connection string (`npx wrangler hyperdrive create queless-db --connection-string=...`)
