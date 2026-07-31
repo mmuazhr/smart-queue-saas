@@ -12,6 +12,12 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Cloudflare Workers kill TCP sockets between requests, so a pooled pg
+// connection reused across requests is a dead socket (alternating 200/500).
+// On Workers: never keep idle connections — every query dials fresh.
+const isWorkers =
+  globalThis.navigator?.userAgent === "Cloudflare-Workers";
+
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
 
@@ -19,8 +25,14 @@ function createPrismaClient(): PrismaClient {
     throw new Error("DATABASE_URL not configured");
   }
 
+  const adapter = new PrismaPg(
+    isWorkers
+      ? { connectionString, max: 2, maxUses: 1, idleTimeoutMillis: 100, allowExitOnIdle: true }
+      : { connectionString }
+  );
+
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter,
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 }

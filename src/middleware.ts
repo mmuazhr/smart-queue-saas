@@ -51,6 +51,10 @@ export default auth((req) => {
   }
 
   if (!user) {
+    // API clients get a 401 they can parse; pages get the login redirect
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
