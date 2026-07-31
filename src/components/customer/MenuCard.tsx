@@ -39,9 +39,9 @@ export default function MenuCard({ item }: { item: MenuItem }) {
       </div>
 
       <div className="p-4 flex-1 flex flex-col">
-        <div className="flex justify-between items-start mb-1 gap-2">
+        <div className="mb-1">
           <h3 className="font-bold text-[var(--color-text)] leading-tight">{item.name}</h3>
-          <span className="text-sm font-black text-[var(--color-primary)] whitespace-nowrap">
+          <span className="block text-sm font-black text-[var(--color-primary)] mt-0.5">
             {formatPrice(item.price)}
           </span>
         </div>
