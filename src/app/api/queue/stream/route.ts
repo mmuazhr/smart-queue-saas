@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { toPlainOrder } from "@/lib/serializers";
 
 export const dynamic = "force-dynamic";
 
@@ -82,8 +83,11 @@ export async function GET(request: NextRequest) {
                 status: { in: ["PAID", "ACCEPTED", "PREPARING", "READY"] },
               },
               orderBy: { createdAt: "asc" },
+              // Must match the /api/orders shape — the dashboard renders
+              // order.orderItems and Decimal fields from this payload
+              include: { orderItems: true },
             });
-            sendEvent({ type: "STORE_QUEUE_UPDATE", orders });
+            sendEvent({ type: "STORE_QUEUE_UPDATE", orders: orders.map(toPlainOrder) });
           }
         } catch (error) {
           logger.error("SSE Polling Error:", error);
