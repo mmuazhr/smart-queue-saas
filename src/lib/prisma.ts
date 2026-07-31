@@ -57,6 +57,13 @@ function createPrismaClient(): PrismaClient {
 }
 
 function getPrismaClient(): PrismaClient {
+  if (isWorkers) {
+    // Workers forbid sharing sockets across concurrent requests: a shared
+    // client's connections belong to whichever request created them and fail
+    // for every other in-flight request. A fresh client per access is cheap
+    // with the driver adapter (no engine) and Hyperdrive absorbs the dials.
+    return createPrismaClient();
+  }
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
   }
@@ -64,7 +71,9 @@ function getPrismaClient(): PrismaClient {
 }
 
 // Lazy proxy: defer client construction until first use so Workers bindings
-// (Hyperdrive) exist by the time the connection string is resolved.
+// (Hyperdrive) exist by the time the connection string is resolved. Each
+// property access resolves against one concrete client, so multi-step APIs
+// like $transaction stay on a single client.
 export const prisma = new Proxy({} as PrismaClient, {
   get(_target, prop) {
     const client = getPrismaClient() as unknown as Record<PropertyKey, unknown>;
