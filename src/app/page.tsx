@@ -42,7 +42,7 @@ export default function HomePage() {
               Smart Queue is the digital queue & ordering system that lets your customers scan, order, and pay from their phone. No more physical lines, no more missed sales.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/register" className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl gradient-primary text-white font-black tracking-wide shadow-2xl shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all">
+              <Link href="/register" className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl gradient-primary text-white font-black tracking-wide whitespace-nowrap shadow-2xl shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all">
                 Get Started Free <ArrowRight className="h-5 w-5" />
               </Link>
               <div className="flex items-center px-6 py-4 text-sm text-[var(--color-text-secondary)]">
