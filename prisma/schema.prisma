@@ -177,3 +177,16 @@ model DailyQueueCounter {
   @@unique([storeId, queueDate])
   @@map("daily_queue_counters")
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String   @map("actor_id")
+  action    String
+  targetType String  @map("target_type")
+  targetId  String   @map("target_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
