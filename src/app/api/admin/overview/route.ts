@@ -50,8 +50,8 @@ export async function GET() {
       activeStores,
       ordersToday,
       orders7d,
-      gmvToday: Number(gmvTodayAgg._sum.total ?? 0),
-      gmv7d: Number(gmv7dAgg._sum.total ?? 0),
+      gmvToday: Number(gmvTodayAgg._sum?.total ?? 0),
+      gmv7d: Number(gmv7dAgg._sum?.total ?? 0),
     },
   });
 }
