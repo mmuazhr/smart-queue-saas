@@ -62,3 +62,35 @@ describe("isStoreOpen", () => {
     expect(isStoreOpen(utcHours, t, "UTC")).toBe(false); // 06:00 before 08:00
   });
 });
+
+describe("overnight windows (close < open wraps past midnight)", () => {
+  const overnight = {
+    friday: { open: "17:00", close: "00:00", isClosed: false },
+    saturday: { open: "22:00", close: "03:00", isClosed: false },
+    sunday: { open: "09:00", close: "21:00", isClosed: true },
+  };
+
+  it("17:00-00:00 is open at 23:59 MYT Friday", () => {
+    // 2026-07-31 is a Friday; 23:59 MYT = 15:59 UTC
+    expect(isStoreOpen(overnight, new Date("2026-07-31T15:59:00Z"))).toBe(true);
+  });
+
+  it("17:00-00:00 is open exactly at midnight MYT (00:00 Saturday, Friday's close)", () => {
+    // 00:00 Sat MYT = 16:00 UTC Friday
+    expect(isStoreOpen(overnight, new Date("2026-07-31T16:00:00Z"))).toBe(true);
+  });
+
+  it("22:00-03:00 Saturday is open at 01:30 MYT Sunday (yesterday's spill)", () => {
+    // 01:30 Sun MYT = 17:30 UTC Saturday — sunday itself is closed, but
+    // saturday's window spills past midnight
+    expect(isStoreOpen(overnight, new Date("2026-08-01T17:30:00Z"))).toBe(true);
+  });
+
+  it("22:00-03:00 Saturday is closed at 04:00 MYT Sunday (spill ended)", () => {
+    expect(isStoreOpen(overnight, new Date("2026-08-01T20:00:00Z"))).toBe(false);
+  });
+
+  it("17:00-00:00 is closed at 12:00 MYT Friday (before opening)", () => {
+    expect(isStoreOpen(overnight, new Date("2026-07-31T04:00:00Z"))).toBe(false);
+  });
+});

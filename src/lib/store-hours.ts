@@ -36,9 +36,6 @@ export function isStoreOpen(
     .format(now)
     .toLowerCase() as (typeof DAYS_OF_WEEK)[number];
 
-  const hours = operatingHours[dayName];
-  if (!hours || hours.isClosed) return false;
-
   // Get current time as HH:MM in the target timezone (en-CA gives 24h zero-padded)
   const currentTime = new Intl.DateTimeFormat("en-CA", {
     hour: "2-digit",
@@ -47,5 +44,32 @@ export function isStoreOpen(
     timeZone,
   }).format(now);
 
-  return currentTime >= hours.open && currentTime <= hours.close;
+  const withinWindow = (entry: OperatingHoursEntry): boolean => {
+    if (entry.isClosed) return false;
+    if (entry.close < entry.open) {
+      // Overnight window (e.g. 17:00–00:00, 22:00–03:00): the same-day part.
+      // "00:00" as close means exactly midnight and only matches the spill check.
+      return currentTime >= entry.open;
+    }
+    return currentTime >= entry.open && currentTime <= entry.close;
+  };
+
+  const hours = operatingHours[dayName];
+  if (hours && withinWindow(hours)) return true;
+
+  // Yesterday's overnight window can spill into the small hours of today
+  // (a stall open Sat 22:00–03:00 is still open at 01:30 Sunday).
+  const dayIndex = DAYS_OF_WEEK.indexOf(dayName);
+  const yesterdayName = DAYS_OF_WEEK[(dayIndex + 6) % 7];
+  const yesterday = operatingHours[yesterdayName];
+  if (
+    yesterday &&
+    !yesterday.isClosed &&
+    yesterday.close < yesterday.open &&
+    currentTime <= yesterday.close
+  ) {
+    return true;
+  }
+
+  return false;
 }
