@@ -46,5 +46,14 @@ export async function PATCH(
     select: { id: true, status: true },
   });
 
+  await prisma.auditLog.create({
+    data: {
+      actorId: gate.user.id,
+      action: parsed.data.status === "SUSPENDED" ? "ADMIN_STORE_SUSPEND" : "ADMIN_STORE_REACTIVATE",
+      targetType: "store",
+      targetId: storeId,
+    },
+  });
+
   return NextResponse.json({ success: true, data: store });
 }
