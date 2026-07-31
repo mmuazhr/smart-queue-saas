@@ -26,6 +26,10 @@ export async function GET() {
   dayStart.setHours(0, 0, 0, 0);
   const week = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const notCancelled = { status: { not: "CANCELLED" } } as const;
+  // GMV counts money actually moving: exclude unpaid abandoned checkouts too
+  const paidThrough = {
+    status: { in: ["PAID", "ACCEPTED", "PREPARING", "READY", "COMPLETED"] },
+  } as const;
 
   const [merchants, stores, activeStores, ordersToday, orders7d, gmvTodayAgg, gmv7dAgg] =
     await Promise.all([
@@ -34,8 +38,8 @@ export async function GET() {
       prisma.store.count({ where: { status: "ACTIVE" } }),
       prisma.order.count({ where: { ...notCancelled, createdAt: { gte: dayStart } } }),
       prisma.order.count({ where: { ...notCancelled, createdAt: { gte: week } } }),
-      prisma.order.aggregate({ _sum: { total: true }, where: { ...notCancelled, createdAt: { gte: dayStart } } }),
-      prisma.order.aggregate({ _sum: { total: true }, where: { ...notCancelled, createdAt: { gte: week } } }),
+      prisma.order.aggregate({ _sum: { total: true }, where: { ...paidThrough, createdAt: { gte: dayStart } } }),
+      prisma.order.aggregate({ _sum: { total: true }, where: { ...paidThrough, createdAt: { gte: week } } }),
     ]);
 
   return NextResponse.json({

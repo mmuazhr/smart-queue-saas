@@ -32,6 +32,14 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
   }
 
+  const existing = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
+  }
+
   const store = await prisma.store.update({
     where: { id: storeId },
     data: { status: parsed.data.status },
