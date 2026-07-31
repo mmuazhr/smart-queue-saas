@@ -55,7 +55,7 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-tr from-orange-500/20 to-transparent rounded-3xl blur-3xl -z-10" />
             <div className="glass rounded-3xl overflow-hidden shadow-2xl border border-white/10 aspect-video lg:aspect-square relative">
               <Image 
-                src="/hero-merchant.png" 
+                src="/hero-queless.png" 
                 alt="Merchant using QueLess"
                 fill
                 className="object-cover hover:scale-105 transition-all duration-700" 
