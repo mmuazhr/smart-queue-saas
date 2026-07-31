@@ -1,9 +1,15 @@
 // =============================================================================
-// Proxy — Route Protection  (Next.js 16: middleware.ts → proxy.ts)
+// Middleware — Route Protection
 // =============================================================================
+// Next.js 16 forces `proxy.ts` onto the nodejs runtime, which
+// @opennextjs/cloudflare rejects. `middleware.ts` keeps the edge runtime, so
+// auth here runs off the edge-safe config (no prisma / bcryptjs).
 
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import { authConfig } from "@/lib/auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 // Paths that never require authentication
 const PUBLIC_PATHS = [
