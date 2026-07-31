@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createOrderSchema } from "@/lib/validators";
 import { auth } from "@/lib/auth";
-import { PaymentService } from "@/lib/payments/service";
+import { PaymentService, isPaymentProviderConfigured } from "@/lib/payments/service";
 import { assignQueueNumber } from "@/lib/queue";
 import { isStoreOpen } from "@/lib/store-hours";
 import { toPlainOrder } from "@/lib/serializers";
@@ -184,6 +184,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Online payment flow (STRIPE / BILLPLZ)
+    if (!isPaymentProviderConfigured(gateway as "STRIPE" | "BILLPLZ")) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "PAYMENT_PROVIDER_UNAVAILABLE",
+          error: "Online payment is currently unavailable.",
+        },
+        { status: 503 }
+      );
+    }
+
     const order = await prisma.$transaction(async (tx) => {
       return tx.order.create({
         data: {

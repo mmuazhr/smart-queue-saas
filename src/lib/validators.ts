@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { z } from "zod";
+import { isHttpUrl } from "./utils";
 
 // ---- Phone Validation (Malaysian format) ----
 
@@ -18,6 +19,21 @@ export const phoneSchema = z
 export const optionalPhoneSchema = z.preprocess(
   (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
   phoneSchema.optional()
+);
+
+// ---- Image URL Validation ----
+
+// Image fields are free-text merchant input; a non-URL value renders as a
+// broken image. Blank inputs mean "no image", so treat "" as absent like
+// optionalPhoneSchema does. Shares isHttpUrl with the render-side check so a
+// saved value never falls back to the placeholder.
+export const optionalImageUrlSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  z
+    .string()
+    .refine(isHttpUrl, "Image URL must be a full http:// or https:// address")
+    .optional()
+    .nullable()
 );
 
 // ---- Store Schemas ----
@@ -60,7 +76,7 @@ export const createMenuItemSchema = z.object({
   description: z.string().max(300).optional(),
   price: z.number().positive("Price must be greater than 0"),
   categoryId: z.string().uuid().optional().nullable(),
-  imageUrl: z.string().optional().nullable(),
+  imageUrl: optionalImageUrlSchema,
   prepTimeMins: z.number().int().min(1).max(120).optional().nullable(),
   sortOrder: z.number().int().min(0).default(0),
   isAvailable: z.boolean().default(true),

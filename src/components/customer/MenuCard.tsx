@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart } from "@/hooks/useCart";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, isHttpUrl } from "@/lib/utils";
 import { Plus, Minus, Info, ImageIcon } from "lucide-react";
 
 interface MenuItem {
@@ -20,7 +20,7 @@ export default function MenuCard({ item }: { item: MenuItem }) {
   return (
     <div className={`glass rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${!item.isAvailable ? "opacity-60 grayscale-[0.5]" : "hover:shadow-xl hover:translate-y-[-2px]"}`}>
       <div className="relative h-40 bg-[var(--color-bg-tertiary)] flex items-center justify-center text-zinc-600 overflow-hidden">
-        {item.imageUrl ? (
+        {isHttpUrl(item.imageUrl) ? (
           <img 
             src={item.imageUrl} 
             alt={item.name} 

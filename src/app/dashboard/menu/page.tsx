@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronUp, Image as ImageIcon, Loader2 } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, isHttpUrl } from "@/lib/utils";
 
 interface MenuItem {
   id: string;
@@ -178,7 +178,7 @@ export default function MenuManagementPage() {
                 <div key={item.id} className={`glass rounded-2xl p-4 flex flex-col transition-all ${!item.isAvailable ? "opacity-60" : ""}`}>
                   <div className="flex justify-between items-start mb-3">
                     <div className="h-16 w-full rounded-xl bg-[var(--color-bg-tertiary)] flex items-center justify-center text-[var(--color-text-muted)] overflow-hidden">
-                      {item.imageUrl ? (
+                      {isHttpUrl(item.imageUrl) ? (
                         <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
                         <ImageIcon className="h-6 w-6 opacity-20" />
@@ -186,7 +186,7 @@ export default function MenuManagementPage() {
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
                       <button 
-                        onClick={() => { setEditingItem(item); setIsItemModalOpen(true); }}
+                        onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
@@ -245,7 +245,7 @@ export default function MenuManagementPage() {
                 <div key={item.id} className="glass rounded-2xl p-4 flex flex-col">
                    <div className="flex justify-between items-start mb-3">
                     <div className="h-16 w-full rounded-xl bg-[var(--color-bg-tertiary)] flex items-center justify-center text-[var(--color-text-muted)] overflow-hidden">
-                      {item.imageUrl ? (
+                      {isHttpUrl(item.imageUrl) ? (
                         <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
                         <ImageIcon className="h-6 w-6 opacity-20" />
@@ -253,7 +253,7 @@ export default function MenuManagementPage() {
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
                       <button 
-                        onClick={() => { setEditingItem(item); setIsItemModalOpen(true); }}
+                        onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
                         <Edit2 className="h-3.5 w-3.5" />

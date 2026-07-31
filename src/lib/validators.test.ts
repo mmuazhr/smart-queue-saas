@@ -3,7 +3,13 @@
 // =============================================================================
 
 import { describe, it, expect } from "vitest";
-import { registerSchema, createStoreSchema, phoneSchema } from "./validators";
+import {
+  registerSchema,
+  createStoreSchema,
+  phoneSchema,
+  createMenuItemSchema,
+  updateMenuItemSchema,
+} from "./validators";
 
 const baseRegister = {
   name: "Test User",
@@ -46,5 +52,67 @@ describe("createStoreSchema optional phone", () => {
 describe("phoneSchema (required contexts unchanged)", () => {
   it("rejects empty string where a phone is required", () => {
     expect(phoneSchema.safeParse("").success).toBe(false);
+  });
+});
+
+const baseMenuItem = { name: "Cheeseburger", price: 12.9 };
+
+describe("createMenuItemSchema imageUrl", () => {
+  it("accepts a missing imageUrl", () => {
+    expect(createMenuItemSchema.safeParse(baseMenuItem).success).toBe(true);
+  });
+
+  it("accepts a null imageUrl", () => {
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: null }).success).toBe(true);
+  });
+
+  it("treats an empty-string imageUrl as absent", () => {
+    const r = createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: "" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.imageUrl).toBeUndefined();
+  });
+
+  it("accepts an https URL such as a Supabase public URL", () => {
+    const url = "https://xyz.supabase.co/storage/v1/object/public/products/menu-items/a.png";
+    const r = createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: url });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.imageUrl).toBe(url);
+  });
+
+  it("accepts a plain http URL", () => {
+    expect(
+      createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: "http://example.com/a.jpg" }).success
+    ).toBe(true);
+  });
+
+  it("rejects free text mistakenly entered as an image URL", () => {
+    expect(
+      createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: "Juicy beef patty with cheese" })
+        .success
+    ).toBe(false);
+  });
+
+  it("rejects a relative path", () => {
+    expect(
+      createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: "/uploads/burger.png" }).success
+    ).toBe(false);
+  });
+
+  it("rejects non-http(s) schemes", () => {
+    expect(
+      createMenuItemSchema.safeParse({ ...baseMenuItem, imageUrl: "javascript:alert(1)" }).success
+    ).toBe(false);
+  });
+});
+
+describe("updateMenuItemSchema imageUrl (partial keeps the rule)", () => {
+  it("accepts an empty-string imageUrl on its own", () => {
+    expect(updateMenuItemSchema.safeParse({ imageUrl: "" }).success).toBe(true);
+  });
+
+  it("still rejects free text on its own", () => {
+    expect(updateMenuItemSchema.safeParse({ imageUrl: "Juicy beef patty with cheese" }).success).toBe(
+      false
+    );
   });
 });

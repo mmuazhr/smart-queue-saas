@@ -81,6 +81,22 @@ export function isStoreOpen(operatingHours: Record<string, { open: string; close
 }
 
 /**
+ * Whether a value is usable as an image source: an absolute http(s) URL.
+ * Merchant image fields are free text, so anything else (a description, a
+ * relative path, a javascript: URL) must fall back to the placeholder rather
+ * than render as a broken image.
+ */
+export function isHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Normalize a Malaysian phone number to +60 format.
  */
 export function normalizePhone(phone: string): string {

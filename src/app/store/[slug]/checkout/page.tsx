@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
 import { ArrowLeft, CreditCard, Phone, User, MessageSquare, ShieldCheck, BadgeCheck, Loader2, Banknote } from "lucide-react";
@@ -22,6 +22,10 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Once an order is placed the cart is emptied on purpose — the empty-cart
+  // guard below must not bounce the customer off the confirmation page.
+  const orderPlacedRef = useRef(false);
+
   // Wait for zustand persist hydration before checking cart emptiness
   useEffect(() => {
     if (useCart.persist.hasHydrated()) {
@@ -33,7 +37,7 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    if (isHydrated && items.length === 0) {
+    if (isHydrated && items.length === 0 && !orderPlacedRef.current) {
       router.push(`/store/${slug}`);
     }
   }, [isHydrated, items, router, slug]);
@@ -70,6 +74,7 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (data.success) {
+        orderPlacedRef.current = true;
         clearCart();
         if (data.data.checkoutUrl) {
           window.location.href = data.data.checkoutUrl;
@@ -77,6 +82,8 @@ export default function CheckoutPage() {
           // CASH order — go straight to tracking
           router.push(`/store/${slug}/order/${data.data.order.id}`);
         }
+      } else if (data.code === "PAYMENT_PROVIDER_UNAVAILABLE") {
+        setError("Online payment is currently unavailable. Please choose Pay at Counter (Cash).");
       } else {
         setError(data.error || "Failed to place order. Please try again.");
       }
@@ -143,7 +150,7 @@ export default function CheckoutPage() {
               <User className="h-4 w-4 text-[var(--color-primary)]" />
               Contact Details
             </h2>
-            <div className="glass rounded-2xl p-6 space-y-5 shadow-xl border-l-4 border-l-[var(--color-primary)]">
+            <div className="glass rounded-2xl p-6 space-y-5 shadow-xl">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[var(--color-text-secondary)] ml-1">Full Name</label>
                 <div className="relative">
