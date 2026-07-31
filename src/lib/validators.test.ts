@@ -11,6 +11,7 @@ import {
   updateMenuItemSchema,
   updateAccountSchema,
   changePasswordSchema,
+  adminStoreStatusSchema,
 } from "./validators";
 
 const baseRegister = {
@@ -150,5 +151,16 @@ describe("changePasswordSchema", () => {
     expect(changePasswordSchema.safeParse({ currentPassword: "x", newPassword: "longenough1" }).success).toBe(true);
     expect(changePasswordSchema.safeParse({ currentPassword: "", newPassword: "longenough1" }).success).toBe(false);
     expect(changePasswordSchema.safeParse({ currentPassword: "x", newPassword: "short" }).success).toBe(false);
+  });
+});
+
+describe("adminStoreStatusSchema", () => {
+  it("accepts ACTIVE and SUSPENDED", () => {
+    expect(adminStoreStatusSchema.safeParse({ status: "ACTIVE" }).success).toBe(true);
+    expect(adminStoreStatusSchema.safeParse({ status: "SUSPENDED" }).success).toBe(true);
+  });
+  it("rejects other values", () => {
+    expect(adminStoreStatusSchema.safeParse({ status: "PENDING" }).success).toBe(false);
+    expect(adminStoreStatusSchema.safeParse({ status: "deleted" }).success).toBe(false);
   });
 });

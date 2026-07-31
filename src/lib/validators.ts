@@ -159,6 +159,14 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
 });
 
+// ---- Admin Schemas ----
+
+export const adminStoreStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "SUSPENDED"]),
+});
+
+export type AdminStoreStatusInput = z.infer<typeof adminStoreStatusSchema>;
+
 // ---- Inferred Types ----
 
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;
