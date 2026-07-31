@@ -142,9 +142,20 @@ export async function PATCH(
     if (newStatus === "READY") timestampFields.readyAt = new Date();
     if (newStatus === "COMPLETED") timestampFields.completedAt = new Date();
 
+    // Collecting a completed cash order means it was paid at the counter —
+    // otherwise the tracking page nags "please pay" forever.
+    const settlesCash =
+      newStatus === "COMPLETED" &&
+      existing.paymentGateway === "CASH" &&
+      existing.paymentStatus === "PENDING";
+
     const updated = await prisma.order.update({
       where: { id: orderId },
-      data: { status: newStatus, ...timestampFields },
+      data: {
+        status: newStatus,
+        ...timestampFields,
+        ...(settlesCash ? { paymentStatus: "PAID", paidAt: new Date() } : {}),
+      },
       include: { store: true },
     });
 
