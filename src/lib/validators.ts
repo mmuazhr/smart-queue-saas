@@ -139,6 +139,26 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
+// ---- Account Schemas ----
+
+// phone: undefined = unchanged, null = clear, string = validated MY number.
+// "" (blank form input) maps to undefined like optionalPhoneSchema.
+const clearablePhoneSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  phoneSchema.nullable().optional()
+);
+
+export const updateAccountSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100).optional(),
+  email: z.string().email("Please enter a valid email").optional(),
+  phone: clearablePhoneSchema,
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
 // ---- Inferred Types ----
 
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;
@@ -151,3 +171,5 @@ export type CreateOrderItemInput = z.infer<typeof createOrderItemSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

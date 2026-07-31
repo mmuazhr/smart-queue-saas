@@ -9,6 +9,8 @@ import {
   phoneSchema,
   createMenuItemSchema,
   updateMenuItemSchema,
+  updateAccountSchema,
+  changePasswordSchema,
 } from "./validators";
 
 const baseRegister = {
@@ -114,5 +116,39 @@ describe("updateMenuItemSchema imageUrl (partial keeps the rule)", () => {
     expect(updateMenuItemSchema.safeParse({ imageUrl: "Juicy beef patty with cheese" }).success).toBe(
       false
     );
+  });
+});
+
+describe("updateAccountSchema", () => {
+  it("accepts a partial update with just a name", () => {
+    expect(updateAccountSchema.safeParse({ name: "Muaz H" }).success).toBe(true);
+  });
+
+  it("passes null phone through as null (explicit clear)", () => {
+    const r = updateAccountSchema.safeParse({ phone: null });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.phone).toBeNull();
+  });
+
+  it("treats empty-string phone as absent (unchanged)", () => {
+    const r = updateAccountSchema.safeParse({ phone: "" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.phone).toBeUndefined();
+  });
+
+  it("rejects an invalid phone", () => {
+    expect(updateAccountSchema.safeParse({ phone: "12345" }).success).toBe(false);
+  });
+
+  it("rejects an invalid email", () => {
+    expect(updateAccountSchema.safeParse({ email: "not-an-email" }).success).toBe(false);
+  });
+});
+
+describe("changePasswordSchema", () => {
+  it("requires current password and 8+ char new password", () => {
+    expect(changePasswordSchema.safeParse({ currentPassword: "x", newPassword: "longenough1" }).success).toBe(true);
+    expect(changePasswordSchema.safeParse({ currentPassword: "", newPassword: "longenough1" }).success).toBe(false);
+    expect(changePasswordSchema.safeParse({ currentPassword: "x", newPassword: "short" }).success).toBe(false);
   });
 });
