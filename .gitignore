@@ -48,3 +48,10 @@ next-env.d.ts
 # tool caches
 /.understand-anything/
 .gstack/
+
+# cloudflare / opennext
+/.open-next/
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars.*
+.wrangler/

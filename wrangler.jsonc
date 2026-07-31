@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "queless",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "queless"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  }
+  // TODO: create the Hyperdrive config against the production Supabase direct
+  // connection string (`npx wrangler hyperdrive create queless-db --connection-string=...`)
+  // and paste the generated id below, then uncomment.
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "<prod-supabase-direct-connection-hyperdrive-id>"
+  //   }
+  // ]
+}
