@@ -116,7 +116,7 @@ export default function OrderTrackingPage() {
           <div className="h-px w-12 bg-[var(--color-border)] mx-auto mb-4" />
           <div className="space-y-1">
             <p className="text-sm font-bold text-[var(--color-text)]">
-              {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === "READY" ? "It's Ready!" : "Please wait..."}
+              {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === "READY" ? "It's Ready!" : "Please wait…"}
             </p>
             {!isCancelled && !isCompleted && order.status !== "READY" && (
               <p className="text-xs text-[var(--color-text-muted)] flex items-center justify-center gap-1.5">

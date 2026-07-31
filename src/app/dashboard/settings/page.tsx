@@ -93,7 +93,7 @@ export default function SettingsPage() {
     document.body.removeChild(link);
   }
 
-  if (loading) return <div className="flex h-64 items-center justify-center animate-pulse-glow">Loading...</div>;
+  if (loading) return <div className="flex h-64 items-center justify-center animate-pulse-glow">Loading…</div>;
   if (!store) return <div className="text-center py-12">No store found. Contact support.</div>;
 
   return (
@@ -202,7 +202,7 @@ export default function SettingsPage() {
                 disabled={saving}
                 className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-white font-semibold gradient-primary transition-all hover:opacity-90 disabled:opacity-50"
               >
-                {saving ? "Saving..." : <><Save className="h-4 w-4" /> Save Changes</>}
+                {saving ? "Saving…" : <><Save className="h-4 w-4" /> Save Changes</>}
               </button>
               {message && (
                 <p className={`mt-3 text-sm ${message.type === "success" ? "text-green-500" : "text-red-500"}`}>

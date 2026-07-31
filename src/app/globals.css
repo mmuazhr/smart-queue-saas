@@ -134,7 +134,8 @@ body {
 /* ---- Gradient Backgrounds ---- */
 
 .gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #ea580c 100%);
+  /* orange-600 → orange-700: keeps white labels readable (amber start washed them out) */
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
 }
 
 .gradient-bg {

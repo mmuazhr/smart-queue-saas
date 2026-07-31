@@ -23,7 +23,7 @@ import { formatPrice } from "@/lib/utils";
 interface AnalyticsData {
   summary: {
     todayRevenue: number;
-    revenueChange: number;
+    revenueChange: number | null;
     todayOrdersCount: number;
     totalOrdersCount: number;
     averageOrderValue: number;
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
         >
           <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Updating..." : "Refresh Data"}
+          {refreshing ? "Updating…" : "Refresh Data"}
         </button>
       </div>
 

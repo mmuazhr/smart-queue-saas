@@ -141,7 +141,7 @@ function LoginForm() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Signing in...
+              Signing in…
             </span>
           ) : (
             "Sign In"
@@ -165,7 +165,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex animate-pulse items-center justify-center p-8">Loading...</div>}>
+    <Suspense fallback={<div className="flex animate-pulse items-center justify-center p-8">Loading…</div>}>
       <LoginForm />
     </Suspense>
   );
