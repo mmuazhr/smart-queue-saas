@@ -13,12 +13,19 @@ export const phoneSchema = z
     "Please enter a valid Malaysian phone number (e.g., +60123456789 or 0123456789)"
   );
 
+// Optional phone: HTML forms submit empty inputs as "", which must not
+// trigger the format error — treat "" (and whitespace) as absent.
+export const optionalPhoneSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  phoneSchema.optional()
+);
+
 // ---- Store Schemas ----
 
 export const createStoreSchema = z.object({
   name: z.string().min(2, "Store name must be at least 2 characters").max(100),
   description: z.string().max(500).optional(),
-  phone: phoneSchema.optional(),
+  phone: optionalPhoneSchema,
   address: z.string().max(300).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
@@ -107,7 +114,7 @@ export const registerSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters").max(100),
     email: z.string().email("Please enter a valid email"),
-    phone: phoneSchema.optional(),
+    phone: optionalPhoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
   })
