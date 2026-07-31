@@ -24,7 +24,9 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "58b584ca829a4bdc9eb74d81acca8526"
+      "id": "58b584ca829a4bdc9eb74d81acca8526",
+      // local dev/build emulation only — the deployed worker uses the real config
+      "localConnectionString": "postgres://postgres:postgres@localhost:51230/template1?sslmode=disable"
     }
   ]
 }
