@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import MenuCard from "@/components/customer/MenuCard";
 import CartDrawer from "@/components/customer/CartDrawer";
 import { useCart } from "@/hooks/useCart";
@@ -80,11 +81,14 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
             "{store.description}"
           </p>
         )}
-        <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+        <div className="flex items-center justify-between gap-4 text-xs text-[var(--color-text-muted)]">
           <div className="flex items-center gap-1.5">
             <MapPin className="h-3 w-3 text-[var(--color-primary)]" />
             {store.address || "Location provided upon pickup"}
           </div>
+          <Link href={`/store/${store.slug}/find`} className="font-bold text-[var(--color-primary)] hover:underline whitespace-nowrap shrink-0">
+            Find my order
+          </Link>
         </div>
       </div>
 
