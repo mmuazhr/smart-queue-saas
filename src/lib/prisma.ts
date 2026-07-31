@@ -56,13 +56,26 @@ function createPrismaClient(): PrismaClient {
   });
 }
 
+// One client per Worker request: sockets must not cross request contexts
+// (Workers reject that), but per-QUERY clients accumulate memory/CPU until
+// the isolate hits resource limits (observed as Cloudflare 1102) — the SSE
+// stream's 3s polls multiply that fast. WeakMap on the request ctx gives
+// exactly one client per request, GC'd with the request.
+const workersClientCache = new WeakMap<object, PrismaClient>();
+
 function getPrismaClient(): PrismaClient {
   if (isWorkers) {
-    // Workers forbid sharing sockets across concurrent requests: a shared
-    // client's connections belong to whichever request created them and fail
-    // for every other in-flight request. A fresh client per access is cheap
-    // with the driver adapter (no engine) and Hyperdrive absorbs the dials.
-    return createPrismaClient();
+    try {
+      const { ctx } = getCloudflareContext();
+      const cached = workersClientCache.get(ctx);
+      if (cached) return cached;
+      const client = createPrismaClient();
+      workersClientCache.set(ctx, client);
+      return client;
+    } catch {
+      // No request context (module init edge cases) — uncached fresh client
+      return createPrismaClient();
+    }
   }
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
