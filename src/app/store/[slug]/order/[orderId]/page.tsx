@@ -5,22 +5,41 @@ import { formatPrice, formatWaitTime } from "@/lib/utils";
 import {
   CheckCircle2, Clock, ChefHat, PackageCheck, AlertCircle,
   ArrowLeft, MapPin, PhoneCall, Share2, RefreshCw, Banknote,
+  Printer, Download, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useOrderStream } from "@/hooks/useOrderStream";
+
+interface OrderItem {
+  id: string;
+  itemName: string;
+  quantity: number;
+  lineTotal: number;
+}
 
 interface Order {
   id: string;
   status: string;
   queueNumber: number | null;
   estimatedWaitMins: number | null;
+  subtotal: number;
+  tax: number;
   total: number;
   customerName: string;
   paymentGateway: string | null;
   paymentStatus: string;
+  createdAt: string;
+  orderItems: OrderItem[];
   store: { name: string; address: string | null; phone: string | null };
 }
+
+/** The install prompt event is not in lib.dom yet. */
+interface InstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+}
+
+const PWA_NUDGE_KEY = "queless-pwa-nudge-dismissed";
 
 export default function OrderTrackingPage() {
   const { slug, orderId } = useParams();
@@ -28,7 +47,29 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [showPwaNudge, setShowPwaNudge] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+
   const { data: streamData } = useOrderStream(orderId as string);
+
+  // localStorage and matchMedia are browser-only — the page is prerendered.
+  useEffect(() => {
+    if (localStorage.getItem(PWA_NUDGE_KEY)) return;
+    if (!window.matchMedia("(display-mode: browser)").matches) return;
+    setShowPwaNudge(true);
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as InstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  function dismissPwaNudge() {
+    localStorage.setItem(PWA_NUDGE_KEY, "1");
+    setShowPwaNudge(false);
+  }
 
   useEffect(() => {
     async function fetchOrder() {
@@ -81,7 +122,7 @@ export default function OrderTrackingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
-      <div className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Link href={`/store/${slug}`} className="p-2 -ml-2 hover:bg-[var(--color-bg-tertiary)] rounded-full transition-all">
             <ArrowLeft className="h-5 w-5" />
@@ -126,6 +167,54 @@ export default function OrderTrackingPage() {
             )}
           </div>
         </section>
+
+        {/* Receipt — completed orders only */}
+        {isCompleted && (
+          <section className="glass rounded-3xl p-6 space-y-4">
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-black">{order.store.name}</h2>
+              <p className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
+                Receipt · Queue #{order.queueNumber ?? "—"}
+              </p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">
+                {new Date(order.createdAt).toLocaleString("en-MY", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+            </div>
+
+            <div className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
+              {order.orderItems.map((item) => (
+                <div key={item.id} className="py-2.5 flex justify-between gap-4 text-sm">
+                  <span className="flex gap-2">
+                    <span className="font-bold text-[var(--color-primary)]">{item.quantity}×</span>
+                    {item.itemName}
+                  </span>
+                  <span className="font-medium shrink-0">{formatPrice(item.lineTotal)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
+                <span>Subtotal</span><span>{formatPrice(order.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
+                <span>SST (6%)</span><span>{formatPrice(order.tax)}</span>
+              </div>
+              <div className="flex justify-between text-base font-black pt-2 border-t border-[var(--color-border)]">
+                <span>Total</span>
+                <span className="text-[var(--color-primary)]">{formatPrice(order.total)}</span>
+              </div>
+            </div>
+
+            <button onClick={() => window.print()}
+              className="w-full py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold flex items-center justify-center gap-2 print:hidden">
+              <Printer className="h-3.5 w-3.5" /> Print receipt
+            </button>
+          </section>
+        )}
 
         {/* Stepper */}
         {!isCancelled && !isCompleted && (
@@ -175,7 +264,7 @@ export default function OrderTrackingPage() {
               <p className="text-xs text-[var(--color-text-muted)] line-clamp-1">{order.store.address}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-2 gap-3 pt-2 print:hidden">
             <a href={`tel:${order.store.phone}`} className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold">
               <PhoneCall className="h-3.5 w-3.5" /> Call Store
             </a>
@@ -186,7 +275,28 @@ export default function OrderTrackingPage() {
           </div>
         </section>
 
-        <p className="text-center text-[10px] text-[var(--color-text-muted)] italic px-6 leading-relaxed">
+        {showPwaNudge && (
+          <div className="p-4 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-2xl flex items-start gap-3 print:hidden">
+            <Download className="h-5 w-5 text-[var(--color-primary)] shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-2">
+              <p className="text-xs font-bold text-[var(--color-text)]">
+                Add QueLess to your home screen for one-tap ordering.
+              </p>
+              {installPrompt && (
+                <button onClick={() => { installPrompt.prompt(); dismissPwaNudge(); }}
+                  className="px-4 py-2 rounded-xl gradient-primary text-white text-[10px] font-black uppercase tracking-widest">
+                  Install
+                </button>
+              )}
+            </div>
+            <button onClick={dismissPwaNudge} aria-label="Dismiss"
+              className="p-1 -m-1 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        <p className="text-center text-[10px] text-[var(--color-text-muted)] italic px-6 leading-relaxed print:hidden">
           Order ID: {order.id}<br />Keep this page open to see live updates.
         </p>
       </div>
