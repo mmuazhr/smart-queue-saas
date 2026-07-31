@@ -5,10 +5,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createOrderSchema } from "@/lib/validators";
-import { Decimal } from "@prisma/client/runtime/library";
 import { auth } from "@/lib/auth";
 import { PaymentService } from "@/lib/payments/service";
-import { NotificationService } from "@/lib/notifications/service";
+import { assignQueueNumber } from "@/lib/queue";
+import { isStoreOpen } from "@/lib/store-hours";
+import { toPlainOrder } from "@/lib/serializers";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
+import { Prisma } from "@prisma/client";
+
+const RATE_LIMIT_POST = 10; // 10 POST /api/orders per minute per IP
 
 // GET /api/orders — List orders for a store (authenticated merchant)
 export async function GET(request: NextRequest) {
@@ -26,7 +32,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "storeId is required" }, { status: 400 });
     }
 
-    // Verify ownership
     const store = await prisma.store.findUnique({
       where: { id: storeId, ownerId: session.user.id },
     });
@@ -35,29 +40,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    const where: any = { storeId };
+    const where: Prisma.OrderWhereInput = { storeId };
     if (status) {
-      const statusList = status.split(",");
-      where.status = { in: statusList };
+      where.status = { in: status.split(",") };
     }
 
     const orders = await prisma.order.findMany({
       where,
-      include: {
-        orderItems: true,
-      },
+      include: { orderItems: true },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
-    return NextResponse.json({ success: true, data: orders });
+    return NextResponse.json({ success: true, data: orders.map(toPlainOrder) });
   } catch (error) {
-    console.error("Fetch orders error:", error);
+    logger.error("Fetch orders error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }
 
 // POST /api/orders — Create a new order and initiate payment
 export async function POST(request: NextRequest) {
+  // Rate limit: 10 requests / minute / IP
+  const ip = getClientIp(request.headers);
+  if (!checkRateLimit(`orders:${ip}`, RATE_LIMIT_POST)) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json();
     const parsed = createOrderSchema.safeParse(body);
@@ -70,14 +82,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { storeId, customerPhone, customerName, notes, items, paymentGateway } = parsed.data;
+    const gateway = paymentGateway ?? "STRIPE";
 
-    // Default to BILLPLZ if not specified (or whichever is preferred)
-    const gateway = (paymentGateway || "STRIPE").toUpperCase() as "STRIPE" | "BILLPLZ";
-
-    // Verify store exists and is active
+    // Verify store exists, is active, and fetch operating hours
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { id: true, status: true, name: true },
+      select: { id: true, status: true, name: true, slug: true, operatingHours: true },
     });
 
     if (!store || store.status !== "ACTIVE") {
@@ -87,7 +97,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch all menu items to verify prices and availability
+    // Enforce operating hours (Asia/Kuala_Lumpur)
+    const hours = store.operatingHours as Record<string, { open: string; close: string; isClosed: boolean }> | null;
+    if (!isStoreOpen(hours)) {
+      return NextResponse.json(
+        { success: false, error: "Store is currently closed" },
+        { status: 400 }
+      );
+    }
+
     const menuItemIds = items.map((item) => item.menuItemId);
     const menuItems = await prisma.menuItem.findMany({
       where: { id: { in: menuItemIds }, storeId },
@@ -100,42 +118,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check availability
     const unavailable = menuItems.filter((mi) => !mi.isAvailable);
     if (unavailable.length > 0) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `Items unavailable: ${unavailable.map((i) => i.name).join(", ")}`,
-        },
+        { success: false, error: `Items unavailable: ${unavailable.map((i) => i.name).join(", ")}` },
         { status: 400 }
       );
     }
 
-    // Build order items and calculate totals server-side
+    // Build order items and calculate totals server-side using Decimal arithmetic
     const menuItemMap = new Map(menuItems.map((mi) => [mi.id, mi]));
-    let subtotal = 0;
+
+    let subtotalCents = 0; // work in integer cents to avoid floating-point drift
     const orderItemsData = items.map((item) => {
-      const menuItem = menuItemMap.get(item.menuItemId)!;
-      const lineTotal = menuItem.price * item.quantity;
-      subtotal += lineTotal;
+      const mi = menuItemMap.get(item.menuItemId)!;
+      const priceCents = Math.round(Number(mi.price) * 100);
+      const lineCents = priceCents * item.quantity;
+      subtotalCents += lineCents;
 
       return {
         menuItemId: item.menuItemId,
-        itemName: menuItem.name,
-        itemPrice: menuItem.price,
+        itemName: mi.name,
+        itemPrice: new Prisma.Decimal((priceCents / 100).toFixed(2)),
         quantity: item.quantity,
-        lineTotal,
+        lineTotal: new Prisma.Decimal((lineCents / 100).toFixed(2)),
         specialInstructions: item.specialInstructions || null,
       };
     });
 
-    const tax = subtotal * 0.06; // 6% SST
-    const total = subtotal + tax;
+    // Tax: 6% SST, half-up rounding
+    const taxCents = Math.round(subtotalCents * 0.06);
+    const totalCents = subtotalCents + taxCents;
 
-    // Create order + items in a transaction
+    const subtotal = new Prisma.Decimal((subtotalCents / 100).toFixed(2));
+    const tax = new Prisma.Decimal((taxCents / 100).toFixed(2));
+    const total = new Prisma.Decimal((totalCents / 100).toFixed(2));
+
+    if (gateway === "CASH") {
+      // Cash: assign queue number immediately and mark PAID
+      const queueNumber = await assignQueueNumber(storeId);
+
+      const order = await prisma.order.create({
+        data: {
+          storeId,
+          customerPhone,
+          customerName,
+          notes: notes || null,
+          subtotal,
+          tax,
+          total,
+          status: "PAID",
+          paymentStatus: "PENDING",
+          paymentGateway: "CASH",
+          queueNumber,
+          paidAt: new Date(),
+          orderItems: { create: orderItemsData },
+        },
+        include: { orderItems: true },
+      });
+
+      return NextResponse.json(
+        { success: true, data: { order: toPlainOrder(order), checkoutUrl: null } },
+        { status: 201 }
+      );
+    }
+
+    // Online payment flow (STRIPE / BILLPLZ)
     const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
+      return tx.order.create({
         data: {
           storeId,
           customerPhone,
@@ -146,38 +196,32 @@ export async function POST(request: NextRequest) {
           total,
           status: "PENDING_PAYMENT",
           paymentStatus: "PENDING",
-          orderItems: {
-            create: orderItemsData,
-          },
+          paymentGateway: gateway,
+          orderItems: { create: orderItemsData },
         },
-        include: {
-          orderItems: true,
-        },
+        include: { orderItems: true },
       });
-
-      return newOrder;
     });
 
-    // Initiate Payment
-    const payment = await PaymentService.initiatePayment(gateway, {
-      orderId: order.id,
-      amount: total,
-      currency: "MYR",
-      customerName,
-      customerPhone,
-      successUrl: `${process.env.NEXTAUTH_URL}/store/${storeId}/order/${order.id}?status=paid`,
-      cancelUrl: `${process.env.NEXTAUTH_URL}/store/${storeId}/checkout?error=cancelled`,
-    });
+    const payment = await PaymentService.initiatePayment(
+      gateway as "STRIPE" | "BILLPLZ",
+      {
+        orderId: order.id,
+        amount: totalCents / 100,
+        currency: "MYR",
+        customerName,
+        customerPhone,
+        successUrl: `${process.env.NEXTAUTH_URL}/store/${store.slug}/order/${order.id}?status=paid`,
+        cancelUrl: `${process.env.NEXTAUTH_URL}/store/${store.slug}/checkout?error=cancelled`,
+      }
+    );
 
-    return NextResponse.json({ 
-      success: true, 
-      data: {
-        order,
-        checkoutUrl: payment.redirectUrl 
-      } 
-    }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: { order: toPlainOrder(order), checkoutUrl: payment.redirectUrl } },
+      { status: 201 }
+    );
   } catch (error) {
-    console.error("Create order error:", error);
+    logger.error("Create order error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

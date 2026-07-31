@@ -3,29 +3,46 @@
 // =============================================================================
 
 import Stripe from "stripe";
-import { CreatePaymentSessionParams, PaymentProvider, PaymentSessionResponse, WebhookVerificationResult } from "./types";
+import {
+  CreatePaymentSessionParams,
+  PaymentProvider,
+  PaymentSessionResponse,
+  WebhookVerificationResult,
+} from "./types";
+import { logger } from "@/lib/logger";
 
-if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
-  console.warn("WARNING: Missing STRIPE_SECRET_KEY. Payments will fail in production.");
+let _stripe: Stripe | null = null;
+
+function getStripeClient(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error(
+      "STRIPE_SECRET_KEY is not configured. Cannot process Stripe payments."
+    );
+  }
+  if (!_stripe) {
+    _stripe = new Stripe(key, { apiVersion: Stripe.API_VERSION });
+  }
+  return _stripe;
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
-  apiVersion: "2024-12-18.acacia" as any, 
-});
-
 export class StripeProvider implements PaymentProvider {
-  async createSession(params: CreatePaymentSessionParams): Promise<PaymentSessionResponse> {
+  async createSession(
+    params: CreatePaymentSessionParams
+  ): Promise<PaymentSessionResponse> {
+    const stripe = getStripeClient();
+
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card", "grabpay"], // Common in SE Asia
+      payment_method_types: ["card", "grabpay"],
       line_items: [
         {
           price_data: {
             currency: params.currency.toLowerCase(),
             product_data: {
               name: `Order #${params.orderId}`,
-              description: `Smart Queue Payment for Store Order`,
+              description: "Smart Queue Payment for Store Order",
             },
-            unit_amount: Math.round(params.amount * 100), // Stripe expects cents
+            unit_amount: Math.round(params.amount * 100),
           },
           quantity: 1,
         },
@@ -51,24 +68,36 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async verifyWebhook(req: Request): Promise<WebhookVerificationResult> {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      logger.error(
+        "STRIPE_WEBHOOK_SECRET is not configured. Cannot verify Stripe webhooks."
+      );
+      return { isValid: false };
+    }
+
     const signature = req.headers.get("stripe-signature");
     if (!signature) {
       return { isValid: false };
     }
 
     try {
+      const stripe = getStripeClient();
       const rawBody = await req.text();
       const event = stripe.webhooks.constructEvent(
         rawBody,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET || "whsec_placeholder"
+        webhookSecret
       );
 
       if (event.type === "checkout.session.completed") {
         const session = event.data.object as Stripe.Checkout.Session;
         return {
           isValid: true,
-          orderId: session.metadata?.orderId || session.client_reference_id || undefined,
+          orderId:
+            session.metadata?.orderId ||
+            session.client_reference_id ||
+            undefined,
           status: "COMPLETED",
           rawBody: event,
         };
@@ -76,7 +105,7 @@ export class StripeProvider implements PaymentProvider {
 
       return { isValid: true, rawBody: event };
     } catch (err) {
-      console.error("Stripe Webhook Error:", err);
+      logger.error("Stripe Webhook Error:", err);
       return { isValid: false };
     }
   }

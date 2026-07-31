@@ -12,18 +12,13 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ---- Enums ----
-// SQLite doesn't support native enums, Prisma handles this with validation
-
-// ---- Models ----
-
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
   phone        String?
   name         String
   passwordHash String   @map("password_hash")
-  role         String   @default("MERCHANT") // CUSTOMER | MERCHANT | ADMIN
+  role         String   @default("MERCHANT")
   isVerified   Boolean  @default(false) @map("is_verified")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -34,26 +29,26 @@ model User {
 }
 
 model Store {
-  id                  String         @id @default(uuid())
-  ownerId             String         @map("owner_id")
+  id                  String   @id @default(uuid())
+  ownerId             String   @map("owner_id")
   name                String
-  slug                String         @unique
+  slug                String   @unique
   description         String?
-  logoUrl             String?        @map("logo_url")
-  bannerUrl           String?        @map("banner_url")
+  logoUrl             String?  @map("logo_url")
+  bannerUrl           String?  @map("banner_url")
   address             String?
   latitude            Float?
   longitude           Float?
   phone               String?
-  status              String         @default("PENDING") // PENDING | ACTIVE | SUSPENDED | CLOSED
-  avgPrepTimeMins     Int            @default(10) @map("avg_prep_time_mins")
-  maxConcurrentOrders Int            @default(5) @map("max_concurrent_orders")
-  operatingHours      Json?          @map("operating_hours")
-  qrCodeUrl           String?        @map("qr_code_url")
-  paymentGateway      String?        @map("payment_gateway") // STRIPE | BILLPLZ | TOYYIBPAY
-  gatewayMerchantId   String?        @map("gateway_merchant_id")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
+  status              String   @default("PENDING")
+  avgPrepTimeMins     Int      @default(10) @map("avg_prep_time_mins")
+  maxConcurrentOrders Int      @default(5) @map("max_concurrent_orders")
+  operatingHours      Json?    @map("operating_hours")
+  qrCodeUrl           String?  @map("qr_code_url")
+  paymentGateway      String?  @map("payment_gateway")
+  gatewayMerchantId   String?  @map("gateway_merchant_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   owner              User               @relation(fields: [ownerId], references: [id])
   categories         Category[]
@@ -80,18 +75,18 @@ model Category {
 }
 
 model MenuItem {
-  id           String   @id @default(uuid())
-  storeId      String   @map("store_id")
-  categoryId   String?  @map("category_id")
+  id           String          @id @default(uuid())
+  storeId      String          @map("store_id")
+  categoryId   String?         @map("category_id")
   name         String
   description  String?
-  price        Float    @map("price")
-  imageUrl     String?  @map("image_url")
-  isAvailable  Boolean  @default(true) @map("is_available")
-  prepTimeMins Int?     @map("prep_time_mins")
-  sortOrder    Int      @default(0) @map("sort_order")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  price        Decimal         @map("price") @db.Decimal(10, 2)
+  imageUrl     String?         @map("image_url")
+  isAvailable  Boolean         @default(true) @map("is_available")
+  prepTimeMins Int?            @map("prep_time_mins")
+  sortOrder    Int             @default(0) @map("sort_order")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
 
   store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
   category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -103,27 +98,27 @@ model MenuItem {
 }
 
 model Order {
-  id               String         @id @default(uuid())
-  storeId          String         @map("store_id")
-  customerPhone    String         @map("customer_phone")
-  customerName     String         @map("customer_name")
-  queueNumber      Int?           @map("queue_number")
-  status           String         @default("PENDING_PAYMENT") // PENDING_PAYMENT | PAID | ACCEPTED | PREPARING | READY | COMPLETED | CANCELLED
-  subtotal         Float
-  tax              Float          @default(0)
-  total            Float
-  estimatedWaitMins Int?          @map("estimated_wait_mins")
-  paymentIntentId  String?        @map("payment_intent_id")
-  paymentGateway   String?        @map("payment_gateway")
-  paymentStatus    String         @default("PENDING") @map("payment_status")
+  id               String    @id @default(uuid())
+  storeId          String    @map("store_id")
+  customerPhone    String    @map("customer_phone")
+  customerName     String    @map("customer_name")
+  queueNumber      Int?      @map("queue_number")
+  status           String    @default("PENDING_PAYMENT")
+  subtotal         Decimal   @db.Decimal(10, 2)
+  tax              Decimal   @default(0) @db.Decimal(10, 2)
+  total            Decimal   @db.Decimal(10, 2)
+  estimatedWaitMins Int?     @map("estimated_wait_mins")
+  paymentIntentId  String?   @map("payment_intent_id")
+  paymentGateway   String?   @map("payment_gateway")
+  paymentStatus    String    @default("PENDING") @map("payment_status")
   notes            String?
-  paidAt           DateTime?      @map("paid_at")
-  acceptedAt       DateTime?      @map("accepted_at")
-  preparingAt      DateTime?      @map("preparing_at")
-  readyAt          DateTime?      @map("ready_at")
-  completedAt      DateTime?      @map("completed_at")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  paidAt           DateTime? @map("paid_at")
+  acceptedAt       DateTime? @map("accepted_at")
+  preparingAt      DateTime? @map("preparing_at")
+  readyAt          DateTime? @map("ready_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   store         Store          @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
@@ -140,9 +135,9 @@ model OrderItem {
   orderId             String  @map("order_id")
   menuItemId          String  @map("menu_item_id")
   itemName            String  @map("item_name")
-  itemPrice           Float   @map("item_price")
+  itemPrice           Decimal @map("item_price") @db.Decimal(10, 2)
   quantity            Int
-  lineTotal           Float   @map("line_total")
+  lineTotal           Decimal @map("line_total") @db.Decimal(10, 2)
   specialInstructions String? @map("special_instructions")
 
   order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -153,16 +148,16 @@ model OrderItem {
 }
 
 model Notification {
-  id             String                     @id @default(uuid())
-  orderId        String                     @map("order_id")
-  recipientPhone String                     @map("recipient_phone")
-  channel        String                     // WHATSAPP | SMS
-  type           String                     // ORDER_CONFIRMED | ORDER_READY | ORDER_CANCELLED
-  status         String                     @default("PENDING") // PENDING | SENT | DELIVERED | FAILED
-  messageBody    String                     @map("message_body")
-  externalId     String?                    @map("external_id")
-  sentAt         DateTime?                  @map("sent_at")
-  createdAt      DateTime                   @default(now()) @map("created_at")
+  id             String    @id @default(uuid())
+  orderId        String    @map("order_id")
+  recipientPhone String    @map("recipient_phone")
+  channel        String
+  type           String
+  status         String    @default("PENDING")
+  messageBody    String    @map("message_body")
+  externalId     String?   @map("external_id")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   order Order @relation(fields: [orderId], references: [id])
 
@@ -181,4 +176,3 @@ model DailyQueueCounter {
   @@unique([storeId, queueDate])
   @@map("daily_queue_counters")
 }
-

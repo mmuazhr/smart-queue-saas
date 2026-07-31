@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        # Informational for now: 19 pre-existing errors in src/ predate this
+        # workflow (tracked for Phase 2 of the remediation plan). Flip this to
+        # a hard failure once those are fixed -- do not leave it soft forever.
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Test + coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholder values so `next build` can statically analyze the app
+          # with no live services. Verified locally that the build needs no
+          # real DB/auth connection (no page performs build-time data fetches).
+          # Real secrets are injected by the deploy platform (Vercel), never CI.
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+          NEXTAUTH_SECRET: "ci-placeholder-secret-not-used-at-runtime"
+          NEXTAUTH_URL: "http://localhost:3000"
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"

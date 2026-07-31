@@ -25,7 +25,7 @@ export const createStoreSchema = z.object({
   avgPrepTimeMins: z.number().int().min(1).max(60).default(10),
   maxConcurrentOrders: z.number().int().min(1).max(50).default(5),
   operatingHours: z
-    .record(z.string(), 
+    .record(z.string(),
       z.object({
         open: z.string().regex(/^\d{2}:\d{2}$/),
         close: z.string().regex(/^\d{2}:\d{2}$/),
@@ -80,7 +80,7 @@ export const createOrderSchema = z.object({
   items: z
     .array(createOrderItemSchema)
     .min(1, "Order must contain at least 1 item"),
-  paymentGateway: z.enum(["STRIPE", "BILLPLZ"]).optional().default("STRIPE"),
+  paymentGateway: z.enum(["STRIPE", "BILLPLZ", "CASH"]).optional().default("STRIPE"),
 });
 
 // ---- Order Status Update ----

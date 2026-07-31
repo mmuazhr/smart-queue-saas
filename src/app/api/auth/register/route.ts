@@ -6,18 +6,28 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { registerSchema } from "@/lib/validators";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
+
+const RATE_LIMIT_REGISTER = 5; // 5 registrations per minute per IP
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request.headers);
+  if (!checkRateLimit(`register:${ip}`, RATE_LIMIT_REGISTER)) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json();
-
-    // Validate input
     const parsed = registerSchema.safeParse(body);
+
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
       for (const issue of parsed.error.issues) {
-        const field = issue.path[0] as string;
-        fieldErrors[field] = issue.message;
+        fieldErrors[issue.path[0] as string] = issue.message;
       }
       return NextResponse.json(
         { success: false, error: "Validation failed", errors: fieldErrors },
@@ -27,11 +37,7 @@ export async function POST(request: NextRequest) {
 
     const { name, email, phone, password } = parsed.data;
 
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json(
         {
@@ -43,37 +49,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user with MERCHANT role
     const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone: phone || null,
-        passwordHash,
-        role: "MERCHANT",
-        isVerified: false,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-      },
+      data: { name, email, phone: phone || null, passwordHash, role: "MERCHANT", isVerified: false },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
     });
 
-    return NextResponse.json(
-      { success: true, data: user },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: user }, { status: 201 });
   } catch (error) {
-    console.error("Registration error:", error);
-    return NextResponse.json(
-      { success: false, error: "Internal server error" },
-      { status: 500 }
-    );
+    logger.error("Registration error:", error);
+    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
 }

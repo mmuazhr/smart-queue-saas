@@ -6,6 +6,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { PaymentService } from "@/lib/payments/service";
 import { NotificationService } from "@/lib/notifications/service";
 import prisma from "@/lib/prisma";
+import { getQueueDate } from "@/lib/queue";
+import { logger } from "@/lib/logger";
+
+interface FulfilledOrder {
+  id: string;
+  customerPhone: string;
+  customerName: string;
+  queueNumber: number;
+  store: { name: string; slug: string };
+}
 
 export async function POST(
   req: NextRequest,
@@ -17,69 +27,94 @@ export async function POST(
     const result = await PaymentService.handleWebhook(provider, req);
 
     if (!result.isValid || !result.orderId) {
-      console.error(`Invalid webhook signature for ${provider}`);
+      logger.error(`Invalid webhook signature for ${provider}`);
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    if (result.status === "COMPLETED") {
-      // 1. Process Order Fulfillment
-      await prisma.$transaction(async (tx) => {
-        // Fetch current order
-        const order = await tx.order.findUnique({
-          where: { id: result.orderId },
-        });
+    if (result.status !== "COMPLETED") {
+      return NextResponse.json({ success: true });
+    }
 
-        if (!order || order.status !== "PENDING_PAYMENT") {
-          return; // Already processed or invalid
-        }
+    const orderId = result.orderId;
+    const today = getQueueDate();
+    let fulfilled: FulfilledOrder | null = null;
 
-        // 2. Assign Queue Number
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const counter = await tx.dailyQueueCounter.upsert({
-          where: {
-            storeId_queueDate: {
-              storeId: order.storeId,
-              queueDate: today,
-            },
-          },
-          update: { lastQueueNumber: { increment: 1 } },
-          create: {
-            storeId: order.storeId,
-            queueDate: today,
-            lastQueueNumber: 1,
-          },
-        });
-
-        // 3. Update Order Status
-        const updatedOrder = await tx.order.update({
-          where: { id: result.orderId },
-          data: {
-            status: "PAID",
-            paymentStatus: "COMPLETED",
-            paidAt: new Date(),
-            queueNumber: counter.lastQueueNumber,
-          },
-          include: { store: true }
-        });
-
-        // 4. Trigger Notification (Phase 5)
-        await NotificationService.sendOrderConfirmed({
-          recipientPhone: order.customerPhone,
-          customerName: order.customerName,
-          storeName: updatedOrder.store.name,
-          orderNumber: counter.lastQueueNumber,
-          orderUrl: `${process.env.NEXTAUTH_URL}/store/${order.storeId}/order/${order.id}`
-        });
+    await prisma.$transaction(async (tx) => {
+      // Fetch order inside transaction to get storeId + current status
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { storeId: true, status: true },
       });
 
-      console.log(`Order ${result.orderId} fulfilled via ${provider}`);
+      if (!order || order.status !== "PENDING_PAYMENT") {
+        // Already processed — treat as idempotent success
+        return;
+      }
+
+      // Atomically increment (or create) the daily queue counter
+      const counter = await tx.dailyQueueCounter.upsert({
+        where: {
+          storeId_queueDate: { storeId: order.storeId, queueDate: today },
+        },
+        update: { lastQueueNumber: { increment: 1 } },
+        create: { storeId: order.storeId, queueDate: today, lastQueueNumber: 1 },
+      });
+
+      // Atomic conditional update — only proceeds if still PENDING_PAYMENT
+      const updated = await tx.order.updateMany({
+        where: { id: orderId, status: "PENDING_PAYMENT" },
+        data: {
+          status: "PAID",
+          paymentStatus: "COMPLETED",
+          paidAt: new Date(),
+          queueNumber: counter.lastQueueNumber,
+        },
+      });
+
+      if (updated.count === 0) {
+        // Race: another invocation won — already processed
+        return;
+      }
+
+      // Read the final state (with store slug) for the notification
+      const finalOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          customerPhone: true,
+          customerName: true,
+          queueNumber: true,
+          store: { select: { name: true, slug: true } },
+        },
+      });
+
+      if (finalOrder?.queueNumber != null) {
+        fulfilled = finalOrder as FulfilledOrder;
+      }
+    });
+
+    // Send notification OUTSIDE the transaction — a slow/failing SMS must never
+    // roll back the DB write.
+    if (fulfilled) {
+      const f = fulfilled as FulfilledOrder;
+      try {
+        await NotificationService.sendOrderConfirmed({
+          recipientPhone: f.customerPhone,
+          customerName: f.customerName,
+          storeName: f.store.name,
+          orderNumber: f.queueNumber,
+          // Use store slug (not storeId) — /store/<uuid>/... would 404
+          orderUrl: `${process.env.NEXTAUTH_URL}/store/${f.store.slug}/order/${f.id}`,
+        });
+      } catch (notifErr) {
+        logger.error(`Notification failed for order ${orderId} (non-fatal):`, notifErr);
+      }
+      logger.info(`Order ${orderId} fulfilled via ${provider}`);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error(`Webhook Processing Error (${provider}):`, error);
+    logger.error(`Webhook Processing Error (${provider}):`, error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -4,16 +4,30 @@
 
 import prisma from "@/lib/prisma";
 
+const MALAYSIA_TZ = "Asia/Kuala_Lumpur";
+
+/**
+ * Returns the start of the current day in Asia/Kuala_Lumpur as a UTC Date.
+ * Queue numbers reset at Malaysian midnight regardless of server timezone.
+ */
+export function getQueueDate(): Date {
+  // en-CA gives YYYY-MM-DD format in the target timezone
+  const mytDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MALAYSIA_TZ,
+  }).format(new Date());
+
+  // Midnight MYT expressed as a fixed-offset ISO string → UTC Date
+  return new Date(`${mytDateStr}T00:00:00+08:00`);
+}
+
 /**
  * Atomically assigns the next queue number for a store on the current date.
  * Uses a Prisma transaction with upsert to prevent duplicate numbers.
  */
 export async function assignQueueNumber(storeId: string): Promise<number> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getQueueDate();
 
   const result = await prisma.$transaction(async (tx) => {
-    // Upsert the daily counter — create if not exists, increment if exists
     const counter = await tx.dailyQueueCounter.upsert({
       where: {
         storeId_queueDate: {
@@ -42,9 +56,6 @@ export async function assignQueueNumber(storeId: string): Promise<number> {
  *
  * Formula:
  *   ETA = ceil(ordersAhead / maxConcurrentOrders) × avgPrepTimeMins
- *
- * @param storeId - The store to calculate ETA for
- * @param queuePosition - How many orders are ahead (0 = next up)
  */
 export async function calculateETA(
   storeId: string,
@@ -60,7 +71,6 @@ export async function calculateETA(
 
   if (!store) throw new Error(`Store ${storeId} not found`);
 
-  // If queue position not provided, calculate from active orders
   let ordersAhead = queuePosition;
   if (ordersAhead === undefined) {
     ordersAhead = await prisma.order.count({
@@ -79,7 +89,6 @@ export async function calculateETA(
 
 /**
  * Gets the current queue position for a specific order.
- * Returns how many orders with lower queue numbers are still active.
  */
 export async function getQueuePosition(orderId: string): Promise<number> {
   const order = await prisma.order.findUnique({
@@ -89,7 +98,6 @@ export async function getQueuePosition(orderId: string): Promise<number> {
 
   if (!order || !order.queueNumber) return 0;
 
-  // Count orders ahead (lower queue number, still active)
   const ordersAhead = await prisma.order.count({
     where: {
       storeId: order.storeId,

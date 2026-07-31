@@ -7,8 +7,9 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createStoreSchema } from "@/lib/validators";
 import { slugify } from "@/lib/utils";
+import { Prisma } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
-// GET /api/stores — List stores owned by authenticated merchant
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -23,7 +24,6 @@ export async function GET() {
   return NextResponse.json({ success: true, data: stores });
 }
 
-// POST /api/stores — Create a new store
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -45,29 +45,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique slug
-    let slug = slugify(parsed.data.name);
-    let slugExists = await prisma.store.findUnique({ where: { slug } });
-    let suffix = 2;
-    while (slugExists) {
-      slug = `${slugify(parsed.data.name)}-${suffix}`;
-      slugExists = await prisma.store.findUnique({ where: { slug } });
-      suffix++;
+    const baseSlug = slugify(parsed.data.name);
+
+    const createData = {
+      ...parsed.data,
+      slug: baseSlug,
+      ownerId: session.user.id,
+      status: "PENDING",
+      operatingHours: (parsed.data.operatingHours as Prisma.InputJsonValue) ?? undefined,
+    };
+
+    try {
+      // Rely on @unique constraint; catch P2002 and retry once with a suffix
+      const store = await prisma.store.create({ data: createData });
+      return NextResponse.json({ success: true, data: store }, { status: 201 });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const fallbackSlug = `${baseSlug}-${Date.now()}`;
+        const store = await prisma.store.create({
+          data: { ...createData, slug: fallbackSlug },
+        });
+        return NextResponse.json({ success: true, data: store }, { status: 201 });
+      }
+      throw err;
     }
-
-    const store = await prisma.store.create({
-      data: {
-        ...parsed.data,
-        slug,
-        ownerId: session.user.id,
-        status: "PENDING",
-        operatingHours: (parsed.data.operatingHours as any) ?? undefined,
-      },
-    });
-
-    return NextResponse.json({ success: true, data: store }, { status: 201 });
   } catch (error) {
-    console.error("Create store error:", error);
+    logger.error("Create store error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

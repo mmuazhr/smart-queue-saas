@@ -2,36 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { formatPrice, formatWaitTime } from "@/lib/utils";
-import { 
-  CheckCircle2, 
-  Clock, 
-  ChefHat, 
-  PackageCheck, 
-  AlertCircle, 
-  ArrowLeft, 
-  MapPin, 
-  PhoneCall, 
-  Share2,
-  RefreshCw
+import {
+  CheckCircle2, Clock, ChefHat, PackageCheck, AlertCircle,
+  ArrowLeft, MapPin, PhoneCall, Share2, RefreshCw, Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useOrderStream } from "@/hooks/useOrderStream";
 
 interface Order {
   id: string;
-  status: string; // PENDING_PAYMENT | PAID | ACCEPTED | PREPARING | READY | COMPLETED | CANCELLED
+  status: string;
   queueNumber: number | null;
   estimatedWaitMins: number | null;
   total: number;
   customerName: string;
-  store: {
-    name: string;
-    address: string | null;
-    phone: string | null;
-  };
+  paymentGateway: string | null;
+  paymentStatus: string;
+  store: { name: string; address: string | null; phone: string | null };
 }
-
-import { useOrderStream } from "@/hooks/useOrderStream";
 
 export default function OrderTrackingPage() {
   const { slug, orderId } = useParams();
@@ -39,20 +28,16 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: streamData, status: streamStatus } = useOrderStream(orderId as string);
+  const { data: streamData } = useOrderStream(orderId as string);
 
-  // Initial fetch
   useEffect(() => {
     async function fetchOrder() {
       try {
         const res = await fetch(`/api/orders/${orderId}`);
         const data = await res.json();
-        if (data.success) {
-          setOrder(data.data);
-        } else {
-          setError(data.error || "Order not found.");
-        }
-      } catch (err) {
+        if (data.success) setOrder(data.data);
+        else setError(data.error || "Order not found.");
+      } catch {
         setError("Failed to load order tracking.");
       } finally {
         setLoading(false);
@@ -61,15 +46,12 @@ export default function OrderTrackingPage() {
     fetchOrder();
   }, [orderId]);
 
-  // Update from stream
   useEffect(() => {
-    if (streamData && streamData.type === "ORDER_UPDATE") {
-      setOrder(prev => prev ? { 
-        ...prev, 
-        status: streamData.status,
-        queueNumber: streamData.queueNumber,
-        estimatedWaitMins: streamData.estimatedWaitMins 
-      } : null);
+    if (streamData && (streamData as { type: string }).type === "ORDER_UPDATE") {
+      const update = streamData as { status: string; queueNumber: number; estimatedWaitMins: number };
+      setOrder((prev) =>
+        prev ? { ...prev, status: update.status, queueNumber: update.queueNumber, estimatedWaitMins: update.estimatedWaitMins } : null
+      );
     }
   }, [streamData]);
 
@@ -86,19 +68,19 @@ export default function OrderTrackingPage() {
   );
 
   const steps = [
-    { key: "PAID", label: "Confirmed", icon: <CheckCircle2 className="h-5 w-5" />, desc: "Order received" },
-    { key: "ACCEPTED", label: "Accepted", icon: <BadgeCheckIcon className="h-5 w-5" />, desc: "Vendor accepted" },
-    { key: "PREPARING", label: "Preparing", icon: <ChefHat className="h-5 w-5" />, desc: "Cooking your food" },
-    { key: "READY", label: "Ready", icon: <PackageCheck className="h-5 w-5" />, desc: "Ready for pickup!" },
+    { key: "PAID",      label: "Confirmed",  icon: <CheckCircle2 className="h-5 w-5" />,  desc: "Order received" },
+    { key: "ACCEPTED",  label: "Accepted",   icon: <BadgeCheckIcon className="h-5 w-5" />, desc: "Vendor accepted" },
+    { key: "PREPARING", label: "Preparing",  icon: <ChefHat className="h-5 w-5" />,        desc: "Cooking your food" },
+    { key: "READY",     label: "Ready",      icon: <PackageCheck className="h-5 w-5" />,   desc: "Ready for pickup!" },
   ];
 
-  const currentStepIndex = steps.findIndex(s => s.key === order.status);
+  const currentStepIndex = steps.findIndex((s) => s.key === order.status);
   const isCancelled = order.status === "CANCELLED";
   const isCompleted = order.status === "COMPLETED";
+  const isCashPending = order.paymentGateway === "CASH" && order.paymentStatus === "PENDING";
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
-      {/* Header */}
       <div className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href={`/store/${slug}`} className="p-2 -ml-2 hover:bg-[var(--color-bg-tertiary)] rounded-full transition-all">
@@ -112,63 +94,61 @@ export default function OrderTrackingPage() {
       </div>
 
       <div className="max-w-md mx-auto px-6 py-8 space-y-8">
-        {/* Queue Status Card */}
-        <section className={`glass rounded-3xl p-8 text-center shadow-2xl transition-all border-b-4 ${order.status === 'READY' ? 'border-green-500 animate-bounce-slow' : 'border-[var(--color-primary)]'}`}>
+        {/* Cash payment notice */}
+        {isCashPending && (
+          <div className="p-5 bg-green-500/10 border border-green-500/30 rounded-3xl flex items-start gap-4">
+            <Banknote className="h-8 w-8 text-green-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-green-500">Pay at the Counter</p>
+              <p className="text-sm text-green-500/80 mt-1">
+                Please pay <span className="font-bold">{formatPrice(order.total)}</span> at the counter when you collect your order.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Queue number */}
+        <section className={`glass rounded-3xl p-8 text-center shadow-2xl transition-all border-b-4 ${order.status === "READY" ? "border-green-500 animate-bounce-slow" : "border-[var(--color-primary)]"}`}>
           <p className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-widest mb-1">Your Queue Number</p>
           <div className="text-7xl font-black text-[var(--color-primary)] mb-4 drop-shadow-xl">
             {order.queueNumber || "..."}
           </div>
-          
           <div className="h-px w-12 bg-[var(--color-border)] mx-auto mb-4" />
-          
           <div className="space-y-1">
             <p className="text-sm font-bold text-[var(--color-text)]">
-              {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === 'READY' ? "It's Ready!" : "Please wait..."}
+              {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === "READY" ? "It's Ready!" : "Please wait..."}
             </p>
-            {!isCancelled && !isCompleted && order.status !== 'READY' && (
+            {!isCancelled && !isCompleted && order.status !== "READY" && (
               <p className="text-xs text-[var(--color-text-muted)] flex items-center justify-center gap-1.5">
-                <Clock className="h-3 w-3" /> Estimated Wait: <span className="text-[var(--color-primary)] font-bold">{formatWaitTime(order.estimatedWaitMins || 0)}</span>
+                <Clock className="h-3 w-3" /> Estimated Wait:{" "}
+                <span className="text-[var(--color-primary)] font-bold">{formatWaitTime(order.estimatedWaitMins || 0)}</span>
               </p>
             )}
           </div>
         </section>
 
-        {/* Status Stepper */}
+        {/* Stepper */}
         {!isCancelled && !isCompleted && (
           <section className="space-y-6 px-2">
             <div className="relative">
-              {/* Progress Line */}
               <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[var(--color-border)]" />
-              <div 
-                className="absolute left-6 top-0 w-0.5 bg-[var(--color-primary)] transition-all duration-1000" 
-                style={{ height: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%` }}
-              />
-
+              <div className="absolute left-6 top-0 w-0.5 bg-[var(--color-primary)] transition-all duration-1000"
+                style={{ height: `${(Math.max(0, currentStepIndex) / (steps.length - 1)) * 100}%` }} />
               <div className="space-y-8">
                 {steps.map((step, index) => {
                   const isDone = index < currentStepIndex;
                   const isActive = index === currentStepIndex;
                   const isPending = index > currentStepIndex;
-
                   return (
-                    <div key={step.key} className={`relative flex items-center gap-6 transition-all duration-500 ${isPending ? "opacity-30 grayscale" : "opacity-100"}`}>
-                      <div className={`z-10 h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 ${
-                        isActive ? "gradient-primary scale-110 text-white ring-4 ring-orange-500/20" : 
-                        isDone ? "bg-green-500 text-white" : "bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]"
-                      }`}>
+                    <div key={step.key} className={`relative flex items-center gap-6 transition-all duration-500 ${isPending ? "opacity-30 grayscale" : ""}`}>
+                      <div className={`z-10 h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 ${isActive ? "gradient-primary scale-110 text-white ring-4 ring-orange-500/20" : isDone ? "bg-green-500 text-white" : "bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]"}`}>
                         {isDone ? <CheckCircle2 className="h-6 w-6" /> : step.icon}
                       </div>
-
                       <div className="flex-1">
-                        <p className={`text-sm font-black transition-colors ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-text)]"}`}>
-                          {step.label}
-                        </p>
+                        <p className={`text-sm font-black ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-text)]"}`}>{step.label}</p>
                         <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{step.desc}</p>
                       </div>
-
-                      {isActive && (
-                        <div className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-ping" />
-                      )}
+                      {isActive && <div className="h-2 w-2 rounded-full bg-[var(--color-primary)] animate-ping" />}
                     </div>
                   );
                 })}
@@ -177,7 +157,6 @@ export default function OrderTrackingPage() {
           </section>
         )}
 
-        {/* Cancellation Message */}
         {isCancelled && (
           <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
             <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
@@ -186,7 +165,6 @@ export default function OrderTrackingPage() {
           </div>
         )}
 
-        {/* Store Info */}
         <section className="glass rounded-3xl p-6 space-y-4">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl gradient-primary flex items-center justify-center text-white p-2">
@@ -197,30 +175,19 @@ export default function OrderTrackingPage() {
               <p className="text-xs text-[var(--color-text-muted)] line-clamp-1">{order.store.address}</p>
             </div>
           </div>
-          
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <a 
-              href={`tel:${order.store.phone}`}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
-            >
+            <a href={`tel:${order.store.phone}`} className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold">
               <PhoneCall className="h-3.5 w-3.5" /> Call Store
             </a>
-            <button 
-              className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
-              onClick={() => {
-                if(navigator.share) {
-                  navigator.share({ title: `My Queue #${order.queueNumber}`, text: `Track my order at ${order.store.name}`, url: window.location.href });
-                }
-              }}
-            >
+            <button className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
+              onClick={() => navigator.share?.({ title: `My Queue #${order.queueNumber}`, text: `Track my order at ${order.store.name}`, url: window.location.href })}>
               <Share2 className="h-3.5 w-3.5" /> Share
             </button>
           </div>
         </section>
 
         <p className="text-center text-[10px] text-[var(--color-text-muted)] italic px-6 leading-relaxed">
-          Order ID: {order.id}<br />
-          Keep this page open to see live updates. You will be notified when your food is ready.
+          Order ID: {order.id}<br />Keep this page open to see live updates.
         </p>
       </div>
     </div>
@@ -229,15 +196,7 @@ export default function OrderTrackingPage() {
 
 function BadgeCheckIcon({ className }: { className?: string }) {
   return (
-    <svg 
-      className={className}
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
       <path d="m9 12 2 2 4-4" />
     </svg>

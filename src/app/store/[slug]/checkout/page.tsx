@@ -3,27 +3,40 @@
 import { useState, useEffect } from "react";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
-import { ArrowLeft, CreditCard, Phone, User, MessageSquare, ShieldCheck, BadgeCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Phone, User, MessageSquare, ShieldCheck, BadgeCheck, Loader2, Banknote } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
+
+type PaymentGateway = "STRIPE" | "BILLPLZ" | "CASH";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { slug } = useParams();
   const { items, getTotal, getTax, getFinalTotal, storeId, clearCart } = useCart();
-  
+
+  const [isHydrated, setIsHydrated] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentGateway, setPaymentGateway] = useState<"STRIPE" | "BILLPLZ">("STRIPE");
+  const [paymentGateway, setPaymentGateway] = useState<PaymentGateway>("STRIPE");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Wait for zustand persist hydration before checking cart emptiness
   useEffect(() => {
-    if (items.length === 0) {
+    if (useCart.persist.hasHydrated()) {
+      setIsHydrated(true);
+      return;
+    }
+    const unsub = useCart.persist.onFinishHydration(() => setIsHydrated(true));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated && items.length === 0) {
       router.push(`/store/${slug}`);
     }
-  }, [items, router, slug]);
+  }, [isHydrated, items, router, slug]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,14 +48,16 @@ export default function CheckoutPage() {
     const payload = {
       storeId,
       customerName,
-      customerPhone: customerPhone.startsWith("+") ? customerPhone : `+60${customerPhone.replace(/^0/, "")}`,
+      customerPhone: customerPhone.startsWith("+")
+        ? customerPhone
+        : `+60${customerPhone.replace(/^0/, "")}`,
       notes,
       paymentGateway,
-      items: items.map(item => ({
+      items: items.map((item) => ({
         menuItemId: item.menuItemId,
         quantity: item.quantity,
-        specialInstructions: item.specialInstructions
-      }))
+        specialInstructions: item.specialInstructions,
+      })),
     };
 
     try {
@@ -54,26 +69,29 @@ export default function CheckoutPage() {
 
       const data = await res.json();
 
-      if (data.success && data.data.checkoutUrl) {
-        // Clear cart before redirecting
+      if (data.success) {
         clearCart();
-        // Redirect to external payment gateway (Stripe/Billplz)
-        window.location.href = data.data.checkoutUrl;
+        if (data.data.checkoutUrl) {
+          window.location.href = data.data.checkoutUrl;
+        } else {
+          // CASH order — go straight to tracking
+          router.push(`/store/${slug}/order/${data.data.order.id}`);
+        }
       } else {
-        setError(data.error || "Failed to initiate payment. Please try again.");
+        setError(data.error || "Failed to place order. Please try again.");
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Check your connection.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  if (items.length === 0) return null;
+  // Show nothing until hydrated (prevents flash-redirect)
+  if (!isHydrated || items.length === 0) return null;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
-      {/* Header */}
       <div className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4 flex items-center gap-4">
         <Link href={`/store/${slug}`} className="p-2 -ml-2 hover:bg-[var(--color-bg-tertiary)] rounded-full transition-all">
           <ArrowLeft className="h-5 w-5" />
@@ -97,22 +115,19 @@ export default function CheckoutPage() {
                     <div>
                       <p className="font-bold text-sm">{item.name}</p>
                       {item.specialInstructions && (
-                        <p className="text-[10px] text-amber-500 italic">"{item.specialInstructions}"</p>
+                        <p className="text-[10px] text-amber-500 italic">&ldquo;{item.specialInstructions}&rdquo;</p>
                       )}
                     </div>
                   </div>
                   <span className="text-sm font-medium">{formatPrice(item.price * item.quantity)}</span>
                 </div>
               ))}
-              
               <div className="pt-4 space-y-1.5 px-1">
                 <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(getTotal())}</span>
+                  <span>Subtotal</span><span>{formatPrice(getTotal())}</span>
                 </div>
                 <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                  <span>SST (6%)</span>
-                  <span>{formatPrice(getTax())}</span>
+                  <span>SST (6%)</span><span>{formatPrice(getTax())}</span>
                 </div>
                 <div className="flex justify-between text-lg font-black pt-2 mt-2 border-t border-[var(--color-border)]">
                   <span>To Pay</span>
@@ -133,111 +148,79 @@ export default function CheckoutPage() {
                 <label className="text-xs font-bold text-[var(--color-text-secondary)] ml-1">Full Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-muted)]" />
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="Enter your name"
-                    value={customerName}
+                  <input required type="text" placeholder="Enter your name" value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
-                  />
+                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all" />
                 </div>
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[var(--color-text-secondary)] ml-1">Phone Number (Malaysia)</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-muted)]" />
-                  <div className="absolute left-10 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--color-text-muted)] border-r border-[var(--color-border)] pr-2">
-                    +60
-                  </div>
-                  <input 
-                    required
-                    type="tel" 
-                    placeholder="123456789"
-                    value={customerPhone}
+                  <div className="absolute left-10 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--color-text-muted)] border-r border-[var(--color-border)] pr-2">+60</div>
+                  <input required type="tel" placeholder="123456789" value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ""))}
-                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-20 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
-                  />
+                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-20 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all" />
                 </div>
               </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[var(--color-text-secondary)] ml-1">Additional Notes (Optional)</label>
                 <div className="relative">
                   <MessageSquare className="absolute left-3 top-4 h-4 w-4 text-[var(--color-text-muted)]" />
-                  <textarea 
-                    placeholder="e.g. Please wrap separately"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none min-h-[100px] transition-all"
-                  />
+                  <textarea placeholder="e.g. Please wrap separately" value={notes} onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none min-h-[100px] transition-all" />
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Payment Method Selector */}
+          {/* Payment Method */}
           <section className="space-y-4">
             <h2 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-muted)] flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-[var(--color-primary)]" />
               Payment Method
             </h2>
             <div className="grid grid-cols-1 gap-3">
-              <button 
-                type="button"
-                onClick={() => setPaymentGateway("BILLPLZ")}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${paymentGateway === "BILLPLZ" ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)] glass opacity-60 hover:opacity-100"}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-blue-600 font-bold">FPX</div>
-                  <div className="text-left">
-                    <p className="text-sm font-black text-[var(--color-text)]">Bank Transfer (FPX)</p>
-                    <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-tighter">Malaysian Online Banking</p>
+              {(
+                [
+                  { key: "BILLPLZ", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-blue-600 font-bold">FPX</div>, title: "Bank Transfer (FPX)", sub: "Malaysian Online Banking" },
+                  { key: "STRIPE", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-indigo-600"><CreditCard className="h-6 w-6" /></div>, title: "Credit / Debit Card", sub: "Powered by Stripe" },
+                  { key: "CASH", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-green-600"><Banknote className="h-6 w-6" /></div>, title: "Pay at Counter (Cash)", sub: "Queue assigned instantly" },
+                ] as const
+              ).map(({ key, icon, title, sub }) => (
+                <button key={key} type="button" onClick={() => setPaymentGateway(key)}
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${paymentGateway === key ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)] glass opacity-60 hover:opacity-100"}`}>
+                  <div className="flex items-center gap-4">
+                    {icon}
+                    <div className="text-left">
+                      <p className="text-sm font-black text-[var(--color-text)]">{title}</p>
+                      <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-tighter">{sub}</p>
+                    </div>
                   </div>
-                </div>
-                {paymentGateway === "BILLPLZ" && <BadgeCheck className="h-6 w-6 text-[var(--color-primary)]" />}
-              </button>
-
-              <button 
-                type="button"
-                onClick={() => setPaymentGateway("STRIPE")}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${paymentGateway === "STRIPE" ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)] glass opacity-60 hover:opacity-100"}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-indigo-600">
-                    <CreditCard className="h-6 w-6" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-black text-[var(--color-text)]">Credit / Debit Card</p>
-                    <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-tighter">Powered by Stripe</p>
-                  </div>
-                </div>
-                {paymentGateway === "STRIPE" && <BadgeCheck className="h-6 w-6 text-[var(--color-primary)]" />}
-              </button>
+                  {paymentGateway === key && <BadgeCheck className="h-6 w-6 text-[var(--color-primary)]" />}
+                </button>
+              ))}
             </div>
           </section>
 
           {error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm animate-shake">
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
               {error}
             </div>
           )}
 
-          <button 
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>Place Order & Pay {formatPrice(getFinalTotal())}</>
+          <button type="submit" disabled={isSubmitting}
+            className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+              paymentGateway === "CASH"
+                ? <>Place Order — Pay {formatPrice(getFinalTotal())} at Counter</>
+                : <>Place Order &amp; Pay {formatPrice(getFinalTotal())}</>
             )}
           </button>
-          
+
           <p className="text-center text-[10px] text-[var(--color-text-muted)] px-8">
-            By placing this order, you agree to our Terms of Service and Privacy Policy. All payments are processed securely.
+            By placing this order, you agree to our Terms of Service and Privacy Policy.
+            {paymentGateway !== "CASH" && " All payments are processed securely."}
           </p>
         </form>
       </div>
