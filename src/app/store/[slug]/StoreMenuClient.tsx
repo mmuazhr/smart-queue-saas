@@ -21,10 +21,9 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
 
   useEffect(() => {
     setStoreId(store.id);
-    if (store.categories.length > 0) {
-      setActiveCategory(store.categories[0].id);
-    }
-    
+    // Default to "All" (null): auto-selecting the first category would hide
+    // uncategorized items, which only render when no filter is active.
+
     const handleScroll = () => {
       setIsHeaderScrolled(window.scrollY > 200);
     };
@@ -95,7 +94,21 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
       {/* Sticky Categories */}
       <div className={`sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] py-2 transition-shadow ${isHeaderScrolled ? "shadow-lg" : ""}`}>
         <div className="overflow-x-auto flex gap-2 px-6 no-scrollbar">
-          {store.categories.map((cat: any) => (
+          {store.categories.length > 0 && (
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                activeCategory === null
+                ? "bg-[var(--color-primary)] text-white shadow-lg shadow-orange-500/20"
+                : "bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              }`}
+            >
+              All
+            </button>
+          )}
+          {store.categories
+            .filter((cat: any) => cat.menuItems.length > 0)
+            .map((cat: any) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
@@ -114,6 +127,7 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
       {/* Menu Grid */}
       <div className="px-6 py-6 space-y-12">
         {store.categories
+          .filter((cat: any) => cat.menuItems.length > 0)
           .filter((cat: any) => activeCategory === null || activeCategory === cat.id)
           .map((category: any) => (
             <section key={category.id} className="animate-fade-in">
