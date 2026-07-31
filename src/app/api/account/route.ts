@@ -7,6 +7,23 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { updateAccountSchema } from "@/lib/validators";
 
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, name: true, email: true, phone: true },
+  });
+  if (!user) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  return NextResponse.json({ success: true, data: user });
+}
+
 export async function PUT(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {

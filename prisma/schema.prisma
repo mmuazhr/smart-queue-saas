@@ -30,7 +30,9 @@ model User {
 
 model Store {
   id                  String   @id @default(uuid())
-  ownerId             String   @map("owner_id")
+  // One store per merchant (product decision 2026-07-31): the dashboard reads
+  // stores[0] everywhere. Drop this constraint if multi-store ever ships.
+  ownerId             String   @unique @map("owner_id")
   name                String
   slug                String   @unique
   description         String?
@@ -56,7 +58,6 @@ model Store {
   orders             Order[]
   dailyQueueCounters DailyQueueCounter[]
 
-  @@index([ownerId])
   @@map("stores")
 }
 

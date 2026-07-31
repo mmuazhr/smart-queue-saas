@@ -21,12 +21,16 @@ export default function AccountPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/session")
+    // Seed from the DB, not the session JWT — the JWT's name is frozen at
+    // login and carries no phone, so seeding from it silently reverts and
+    // wipes saved values on the next save.
+    fetch("/api/account")
       .then((r) => r.json())
-      .then((s) => {
-        if (s?.user) {
-          setName(s.user.name ?? "");
-          setEmail(s.user.email ?? "");
+      .then((res) => {
+        if (res?.success && res.data) {
+          setName(res.data.name ?? "");
+          setEmail(res.data.email ?? "");
+          setPhone(res.data.phone ?? "");
         }
       })
       .finally(() => setLoading(false));
