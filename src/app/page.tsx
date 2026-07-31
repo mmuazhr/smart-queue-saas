@@ -5,6 +5,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CheckCircle2, Zap, Smartphone, BarChart3, Clock, ArrowRight, ShieldCheck } from "lucide-react";
+import MobileNav from "./MobileNav";
 
 export default function HomePage() {
   return (
@@ -24,6 +25,7 @@ export default function HomePage() {
               Start Free Trial
             </Link>
           </div>
+          <MobileNav />
         </div>
       </nav>
 
