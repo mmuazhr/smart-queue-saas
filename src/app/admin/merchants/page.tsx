@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
@@ -143,7 +144,12 @@ export default function AdminMerchantsPage() {
                   <td className="px-6 py-4">
                     {store ? (
                       <>
-                        <p className="font-medium">{store.name}</p>
+                        <Link
+                          href={`/admin/merchants/${store.id}`}
+                          className="font-medium hover:text-[var(--color-primary)] hover:underline"
+                        >
+                          {store.name}
+                        </Link>
                         <a
                           href={`/store/${store.slug}`}
                           target="_blank"
