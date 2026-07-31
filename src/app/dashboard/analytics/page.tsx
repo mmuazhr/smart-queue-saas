@@ -134,7 +134,13 @@ export default function AnalyticsPage() {
             </h3>
             <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-muted)]">By Hour</span>
           </div>
-          <div className="h-64 flex items-end gap-1 sm:gap-2">
+          <div className="h-64 flex items-end gap-1 sm:gap-2 relative">
+            {data && data.hourlyDistribution.every((h) => h.count === 0) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40">
+                <p className="text-sm">No orders yet today.</p>
+                <p className="text-xs mt-1">Hourly volume appears here as orders come in.</p>
+              </div>
+            )}
             {data?.hourlyDistribution.map((h, i) => {
               const maxCount = Math.max(...data.hourlyDistribution.map(d => d.count), 1);
               const height = (h.count / maxCount) * 100;
