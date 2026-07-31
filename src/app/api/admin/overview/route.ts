@@ -29,7 +29,7 @@ export async function GET() {
   // GMV counts money actually moving: exclude unpaid abandoned checkouts too
   const paidThrough = {
     status: { in: ["PAID", "ACCEPTED", "PREPARING", "READY", "COMPLETED"] },
-  } as const;
+  };
 
   const [merchants, stores, activeStores, ordersToday, orders7d, gmvTodayAgg, gmv7dAgg] =
     await Promise.all([
