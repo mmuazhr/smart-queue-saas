@@ -32,7 +32,15 @@ export default auth((req) => {
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/public/");
 
-  if (isPublicPath || isStorePath || isNextStatic) {
+  // Root-level files served from /public (hero image, app icon, sw.js).
+  // Single path segment + known-safe extension only, so nested app routes
+  // like /dashboard/foo.png still require auth.
+  const isPublicFile =
+    /^\/[\w.-]+\.(png|jpe?g|webp|gif|svg|ico|js|json|txt|xml|webmanifest)$/.test(
+      pathname
+    );
+
+  if (isPublicPath || isStorePath || isNextStatic || isPublicFile) {
     return NextResponse.next();
   }
 
