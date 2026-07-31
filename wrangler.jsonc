@@ -20,14 +20,11 @@
   "vars": {
     "NEXTJS_ENV": "production",
     "AUTH_TRUST_HOST": "true"
-  }
-  // TODO: create the Hyperdrive config against the production Supabase direct
-  // connection string (`npx wrangler hyperdrive create queless-db --connection-string=...`)
-  // and paste the generated id below, then uncomment.
-  // "hyperdrive": [
-  //   {
-  //     "binding": "HYPERDRIVE",
-  //     "id": "<prod-supabase-direct-connection-hyperdrive-id>"
-  //   }
-  // ]
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "58b584ca829a4bdc9eb74d81acca8526"
+    }
+  ]
 }
