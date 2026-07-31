@@ -39,6 +39,8 @@ import { useOrderStream } from "@/hooks/useOrderStream";
 export default function QueueDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
   const prevOrderCount = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -101,6 +103,9 @@ export default function QueueDashboardPage() {
   }
 
   async function updateOrderStatus(orderId: string, status: string) {
+    if (updatingOrderId) return; // one transition at a time
+    setUpdatingOrderId(orderId);
+    setActionError(null);
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
@@ -108,10 +113,15 @@ export default function QueueDashboardPage() {
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
-        fetchOrders();
+        await fetchOrders();
+      } else {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "Could not update the order — please try again.");
       }
-    } catch (error) {
-      console.error("Failed to update order:", error);
+    } catch {
+      setActionError("Network problem — the order was not updated. Check your connection and retry.");
+    } finally {
+      setUpdatingOrderId(null);
     }
   }
 
@@ -149,6 +159,15 @@ export default function QueueDashboardPage() {
           Refresh
         </button>
       </div>
+
+      {actionError && (
+        <div className="flex items-center justify-between rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-500">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} aria-label="Dismiss error" className="font-bold px-2">
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Kanban Columns */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -253,17 +272,19 @@ export default function QueueDashboardPage() {
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() => updateOrderStatus(order.id, col.nextStatus)}
-                          className="flex-1 rounded-lg py-2 text-xs font-semibold text-white transition-all hover:opacity-90"
+                          disabled={updatingOrderId !== null}
+                          className="flex-1 rounded-lg py-2 text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                           style={{ background: col.color }}
                         >
-                          {col.nextAction}
+                          {updatingOrderId === order.id ? "Updating…" : col.nextAction}
                         </button>
                         {col.rejectStatus && (
                           <button
                             onClick={() =>
                               updateOrderStatus(order.id, col.rejectStatus!)
                             }
-                            className="rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-[var(--color-error-bg)]"
+                            disabled={updatingOrderId !== null}
+                            className="rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-[var(--color-error-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
                             style={{
                               borderColor: "var(--color-border)",
                               color: "var(--color-error)",
