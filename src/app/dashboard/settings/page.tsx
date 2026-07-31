@@ -524,6 +524,7 @@ function CreateStoreForm({ onCreated }: CreateStoreFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setError("");
     setFieldErrors({});
@@ -542,14 +543,17 @@ function CreateStoreForm({ onCreated }: CreateStoreFormProps) {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (data.success) {
+      // STORE_EXISTS means an earlier submit already worked — treat as success.
+      if (data.success || data.code === "STORE_EXISTS") {
         await onCreated();
         return;
       }
       setFieldErrors(data.errors || {});
       setError(data.error || "Failed to create your store.");
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(
+        "Network problem — your store may not have been created. Reload the page to check before retrying."
+      );
     } finally {
       setSubmitting(false);
     }
