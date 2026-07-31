@@ -36,7 +36,7 @@ export default function HomePage() {
               Built for Malaysian Food Stalls
             </div>
             <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight">
-              Tukarkan Barisan Panjang Kepada <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-rose-500">Jualan.</span>
+              Tukarkan Barisan Panjang Kepada <span className="text-orange-500">Jualan.</span>
             </h1>
             <p className="text-lg text-[var(--color-text-secondary)] leading-relaxed max-w-lg">
               Smart Queue is the digital queue & ordering system that lets your customers scan, order, and pay from their phone. No more physical lines, no more missed sales.
@@ -45,16 +45,8 @@ export default function HomePage() {
               <Link href="/register" className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl gradient-primary text-white font-black tracking-wide shadow-2xl shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all">
                 Get Started Free <ArrowRight className="h-5 w-5" />
               </Link>
-              <div className="flex items-center gap-4 px-6 py-4">
-                <div className="flex -space-x-3">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="h-10 w-10 rounded-full border-2 border-[var(--color-bg)] bg-zinc-800" />
-                  ))}
-                </div>
-                <div className="text-xs">
-                  <p className="font-bold">500+ Merchants</p>
-                  <p className="text-[var(--color-text-muted)] tracking-tighter uppercase">Joined this month</p>
-                </div>
+              <div className="flex items-center px-6 py-4 text-sm text-[var(--color-text-secondary)]">
+                <p>No hardware. No app download. Set up in minutes.</p>
               </div>
             </div>
           </div>
