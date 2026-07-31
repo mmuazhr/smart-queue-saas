@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
         <StatCard 
           label="Today's Revenue" 
           value={formatPrice(data?.summary.todayRevenue || 0)} 
-          change={data?.summary.revenueChange || 0}
+          change={data?.summary.revenueChange ?? undefined}
           icon={<DollarSign className="h-5 w-5 text-green-500" />}
           delay={0}
         />

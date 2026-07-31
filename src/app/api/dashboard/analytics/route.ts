@@ -58,8 +58,11 @@ export async function GET(request: NextRequest) {
 
     const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total), 0);
     const yesterdayRevenue = yesterdayOrders.reduce((sum, o) => sum + Number(o.total), 0);
+    // No baseline yesterday → no meaningful delta (null hides the badge)
     const revenueChange =
-      yesterdayRevenue === 0 ? 100 : ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+      yesterdayRevenue === 0
+        ? null
+        : ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
 
     const topItems = await prisma.orderItem.groupBy({
       by: ["menuItemId", "itemName"],
@@ -87,7 +90,8 @@ export async function GET(request: NextRequest) {
       data: {
         summary: {
           todayRevenue,
-          revenueChange: parseFloat(revenueChange.toFixed(1)),
+          revenueChange:
+            revenueChange === null ? null : parseFloat(revenueChange.toFixed(1)),
           todayOrdersCount: todayOrders.length,
           totalOrdersCount,
           averageOrderValue: todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0,
