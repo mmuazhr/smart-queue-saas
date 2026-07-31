@@ -64,23 +64,6 @@ export function formatWaitTime(minutes: number): string {
 }
 
 /**
- * Check if a store is currently open based on operating hours.
- */
-export function isStoreOpen(operatingHours: Record<string, { open: string; close: string; isClosed: boolean }> | null): boolean {
-  if (!operatingHours) return true; // If no hours set, assume always open
-
-  const now = new Date();
-  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const today = days[now.getDay()];
-  const hours = operatingHours[today];
-
-  if (!hours || hours.isClosed) return false;
-
-  const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-  return currentTime >= hours.open && currentTime <= hours.close;
-}
-
-/**
  * Whether a value is usable as an image source: an absolute http(s) URL.
  * Merchant image fields are free text, so anything else (a description, a
  * relative path, a javascript: URL) must fall back to the placeholder rather

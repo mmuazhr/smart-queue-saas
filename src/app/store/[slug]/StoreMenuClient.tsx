@@ -5,7 +5,7 @@ import MenuCard from "@/components/customer/MenuCard";
 import CartDrawer from "@/components/customer/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { ShoppingBag, ChevronRight, MapPin, Clock, Info } from "lucide-react";
-import { isStoreOpen } from "@/lib/utils";
+import { isStoreOpen } from "@/lib/store-hours";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface StoreMenuClientProps {
