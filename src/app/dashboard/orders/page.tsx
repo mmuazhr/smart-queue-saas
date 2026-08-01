@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Filter, Calendar, ChevronRight, ChevronDown, CheckCircle2, XCircle, Clock, Package, MessageSquare } from "lucide-react";
-import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import { formatPrice, formatRelativeTime, displayOrderStatus } from "@/lib/utils";
 
 interface OrderItem {
   id: string;
@@ -80,7 +80,7 @@ export default function OrderHistoryPage() {
   );
 
   function getStatusStyle(status: string) {
-    switch (status) {
+    switch (displayOrderStatus(status)) {
       case "COMPLETED": return "bg-green-500/10 text-green-500 border-green-500/20";
       case "CANCELLED": return "bg-red-500/10 text-red-500 border-red-500/20";
       case "READY": return "bg-amber-500/10 text-amber-500 border-amber-500/20";
@@ -145,7 +145,7 @@ export default function OrderHistoryPage() {
               <option value="CANCELLED">Cancelled</option>
               <option value="READY">Ready</option>
               <option value="PREPARING">Preparing</option>
-              <option value="ACCEPTED">Accepted</option>
+              <option value="PAID,ACCEPTED">Accepted</option>
             </select>
           </div>
           <button className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] glass text-sm font-medium hover:bg-[var(--color-bg-tertiary)] transition-all">
@@ -194,7 +194,7 @@ export default function OrderHistoryPage() {
 
                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${getStatusStyle(order.status)}`}>
                   {getStatusIcon(order.status)}
-                  {order.status}
+                  {displayOrderStatus(order.status)}
                 </div>
 
                 <div className="ml-2">

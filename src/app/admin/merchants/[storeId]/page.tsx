@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, Eye } from "lucide-react";
-import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import { formatPrice, formatRelativeTime, displayOrderStatus } from "@/lib/utils";
 
 interface OrderItem {
   id: string;
@@ -46,8 +46,10 @@ interface StoreDetail {
   todayStats: { orders: number; gmv: number };
 }
 
+// Keyed on the display label (see displayOrderStatus) — PAID and ACCEPTED
+// share the merged "Accepted" kanban stage, so both resolve to the same
+// warning color here.
 const STATUS_COLORS: Record<string, string> = {
-  PAID: "var(--color-info)",
   ACCEPTED: "var(--color-warning)",
   PREPARING: "var(--color-primary)",
   READY: "var(--color-success)",
@@ -169,7 +171,7 @@ export default function AdminStoreDetailPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {activeOrders.map((order) => {
-              const color = STATUS_COLORS[order.status] ?? "var(--color-text-muted)";
+              const color = STATUS_COLORS[displayOrderStatus(order.status)] ?? "var(--color-text-muted)";
               return (
                 <div key={order.id} className="glass rounded-xl p-4">
                   <div className="mb-3 flex items-start justify-between">
@@ -184,7 +186,7 @@ export default function AdminStoreDetailPage() {
                         className="rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest"
                         style={{ background: `${color}15`, color }}
                       >
-                        {order.status}
+                        {displayOrderStatus(order.status)}
                       </span>
                       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                         {formatRelativeTime(new Date(order.createdAt))}

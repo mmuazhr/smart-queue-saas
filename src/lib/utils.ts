@@ -26,6 +26,17 @@ export function slugify(text: string): string {
 }
 
 /**
+ * Maps an order status to its merchant-facing display label. PAID and
+ * ACCEPTED were merged into one "Accepted" kanban stage — new orders never
+ * reach ACCEPTED again, but legacy rows confirmed before the merge can still
+ * carry that status, so both must read identically wherever a raw status is
+ * shown.
+ */
+export function displayOrderStatus(status: string): string {
+  return status === "PAID" ? "ACCEPTED" : status;
+}
+
+/**
  * Format a price value as Malaysian Ringgit.
  */
 export function formatPrice(price: number | string): string {

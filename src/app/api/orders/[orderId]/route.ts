@@ -12,9 +12,13 @@ import { toPlainOrder } from "@/lib/serializers";
 import { logger } from "@/lib/logger";
 
 // Forward-only status transitions allowed
+// PAID and ACCEPTED are merged into one merchant-facing kanban stage
+// ("Accepted") — confirming payment now implies acceptance. PAID transitions
+// straight to PREPARING. ACCEPTED->PREPARING/CANCELLED stays reachable only
+// for legacy in-flight rows that were already sitting at ACCEPTED.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   AWAITING_CONFIRMATION: ["PAID", "CANCELLED"],
-  PAID: ["ACCEPTED", "CANCELLED"],
+  PAID: ["PREPARING", "CANCELLED"],
   ACCEPTED: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY", "CANCELLED"],
   READY: ["COMPLETED"],

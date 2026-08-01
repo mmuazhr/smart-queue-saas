@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Phone, Search, Loader2, Receipt, ChevronRight } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, displayOrderStatus } from "@/lib/utils";
 
 interface FoundOrder {
   id: string;
@@ -118,7 +118,7 @@ export default function FindOrderClient({ slug, storeId, storeName }: FindOrderC
                   <div>
                     <p className="text-sm font-black">{formatPrice(order.total)}</p>
                     <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-                      {order.status.replace(/_/g, " ")} ·{" "}
+                      {displayOrderStatus(order.status).replace(/_/g, " ")} ·{" "}
                       {new Date(order.createdAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>

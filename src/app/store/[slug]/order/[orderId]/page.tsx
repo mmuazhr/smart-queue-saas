@@ -125,14 +125,18 @@ export default function OrderTrackingPage() {
     </div>
   );
 
+  // PAID and ACCEPTED are one merged step: confirming payment IS accepting
+  // the order. Legacy orders sitting at ACCEPTED (confirmed before this merge
+  // shipped) must still light up the same step, so the lookup below
+  // normalizes ACCEPTED -> PAID before matching against `steps`.
   const steps = [
-    { key: "PAID",      label: "Confirmed",  icon: <CheckCircle2 className="h-5 w-5" />,  desc: "Order received" },
-    { key: "ACCEPTED",  label: "Accepted",   icon: <BadgeCheckIcon className="h-5 w-5" />, desc: "Vendor accepted" },
-    { key: "PREPARING", label: "Preparing",  icon: <ChefHat className="h-5 w-5" />,        desc: "Cooking your food" },
-    { key: "READY",     label: "Ready",      icon: <PackageCheck className="h-5 w-5" />,   desc: "Ready for pickup!" },
+    { key: "PAID",      label: "Accepted",  icon: <CheckCircle2 className="h-5 w-5" />, desc: "Shop accepted your order" },
+    { key: "PREPARING", label: "Preparing", icon: <ChefHat className="h-5 w-5" />,       desc: "Cooking your food" },
+    { key: "READY",     label: "Ready",     icon: <PackageCheck className="h-5 w-5" />,  desc: "Ready for pickup!" },
   ];
 
-  const currentStepIndex = steps.findIndex((s) => s.key === order.status);
+  const stepStatus = order.status === "ACCEPTED" ? "PAID" : order.status;
+  const currentStepIndex = steps.findIndex((s) => s.key === stepStatus);
   const isCancelled = order.status === "CANCELLED";
   const isCompleted = order.status === "COMPLETED";
   const isAwaitingConfirmation = order.status === "AWAITING_CONFIRMATION";
@@ -349,14 +353,5 @@ export default function OrderTrackingPage() {
         </p>
       </div>
     </div>
-  );
-}
-
-function BadgeCheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
   );
 }
