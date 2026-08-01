@@ -1,4 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// These tests cover only the pure helpers, but the module under test imports
+// the Prisma singleton, which throws at import time without DATABASE_URL.
+// Mock it so the suite never depends on shell environment.
+vi.mock("./prisma", () => ({ prisma: {} }));
+
 import { PROOF_RETENTION_MS, retentionCutoff, isExpiredFileEntry, collectExpiredKeys } from "./proof-retention";
 import type { ProofStorageEntry } from "./storage";
 
