@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import QRCode from "qrcode";
-import { Save, Download, QrCode, Clock, Store as StoreIcon, MapPin, Phone, MessageSquare, CalendarClock, Copy, Check, ExternalLink, Rocket } from "lucide-react";
+import { Save, Download, QrCode, Clock, Store as StoreIcon, MapPin, Phone, MessageSquare, CalendarClock, Copy, Check, ExternalLink, Rocket, Wallet, Upload, Plus, Trash2 } from "lucide-react";
+import { storeChargesSchema, parseStoreCharges, type StoreCharge } from "@/lib/charges";
 
 interface OperatingHoursEntry {
   open: string;
@@ -23,6 +24,9 @@ interface Store {
   maxConcurrentOrders: number;
   status: string;
   operatingHours: OperatingHours | null;
+  paymentQrUrl: string | null;
+  paymentInstructions: string | null;
+  charges: unknown;
 }
 
 // isStoreOpen() looks days up by lowercase English name; the Malaysian week is
@@ -69,6 +73,12 @@ export default function SettingsPage() {
   const [justCreated, setJustCreated] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [hoursMessage, setHoursMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [charges, setCharges] = useState<StoreCharge[]>([]);
+  const [savingPayments, setSavingPayments] = useState(false);
+  const [paymentsMessage, setPaymentsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [qrUploading, setQrUploading] = useState(false);
+  const [qrMessage, setQrMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadStore = useCallback(async () => {
     try {
@@ -78,6 +88,8 @@ export default function SettingsPage() {
         const currentStore: Store = data.data[0];
         setStore(currentStore);
         setHours(hoursFromStore(currentStore.operatingHours));
+        setPaymentInstructions(currentStore.paymentInstructions ?? "");
+        setCharges(parseStoreCharges(currentStore.charges));
 
         // Generate QR code
         const origin = window.location.origin;
@@ -171,6 +183,96 @@ export default function SettingsPage() {
 
   function updateDay(dayKey: string, patch: Partial<OperatingHoursEntry>) {
     setHours({ ...hours, [dayKey]: { ...hours[dayKey], ...patch } });
+  }
+
+  function updateCharge(index: number, patch: Partial<StoreCharge>) {
+    setCharges(charges.map((charge, i) => (i === index ? { ...charge, ...patch } : charge)));
+  }
+
+  function addCharge() {
+    if (charges.length >= 5) return;
+    setCharges([...charges, { label: "", rate: 0, enabled: true }]);
+  }
+
+  function removeCharge(index: number) {
+    setCharges(charges.filter((_, i) => i !== index));
+  }
+
+  async function handleQrUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file on a retry
+    if (!file || !store) return;
+
+    setQrUploading(true);
+    setQrMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", "qr");
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        setQrMessage({ type: "error", text: uploadData.error || "Upload failed." });
+        return;
+      }
+
+      const putRes = await fetch(`/api/stores/${store.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentQrUrl: uploadData.data.url }),
+      });
+      const putData = await putRes.json();
+      if (putData.success) {
+        setStore(putData.data);
+        setQrMessage({ type: "success", text: "QR code updated." });
+      } else {
+        setQrMessage({ type: "error", text: putData.error || "Failed to save QR code." });
+      }
+    } catch (error) {
+      setQrMessage({ type: "error", text: "Something went wrong." });
+    } finally {
+      setQrUploading(false);
+    }
+  }
+
+  async function handleSavePayments(e: React.FormEvent) {
+    e.preventDefault();
+    if (!store) return;
+
+    setPaymentsMessage(null);
+
+    const parsedCharges = storeChargesSchema.safeParse(charges);
+    if (!parsedCharges.success) {
+      setPaymentsMessage({ type: "error", text: parsedCharges.error.issues[0]?.message || "Invalid charge." });
+      return;
+    }
+
+    setSavingPayments(true);
+
+    try {
+      const res = await fetch(`/api/stores/${store.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentInstructions: paymentInstructions.trim(),
+          charges: parsedCharges.data,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStore(data.data);
+        setPaymentInstructions(data.data.paymentInstructions ?? "");
+        setCharges(parseStoreCharges(data.data.charges));
+        setPaymentsMessage({ type: "success", text: "Payment settings saved." });
+      } else {
+        setPaymentsMessage({ type: "error", text: data.error || "Failed to save payment settings." });
+      }
+    } catch (error) {
+      setPaymentsMessage({ type: "error", text: "Something went wrong." });
+    } finally {
+      setSavingPayments(false);
+    }
   }
 
   function downloadQR() {
@@ -407,6 +509,157 @@ export default function SettingsPage() {
               {hoursMessage && (
                 <p className={`mt-3 text-sm ${hoursMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
                   {hoursMessage.text}
+                </p>
+              )}
+            </div>
+          </form>
+
+          {/* Payments & Charges */}
+          <form onSubmit={handleSavePayments} className="glass rounded-2xl p-6 space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-[var(--color-primary)]" />
+                Payments & Charges
+              </h2>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                Set up how customers pay you directly and what gets added on top of the subtotal.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">DuitNow QR</label>
+              <div className="flex gap-4 items-start">
+                <div className="h-24 w-24 shrink-0 rounded-lg bg-white flex items-center justify-center overflow-hidden border border-[var(--color-border)]">
+                  {store.paymentQrUrl ? (
+                    <img src={store.paymentQrUrl} alt="Payment QR code" className="w-full h-full object-contain p-1" />
+                  ) : (
+                    <QrCode className="h-8 w-8 opacity-20" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("qr-upload")?.click()}
+                    disabled={qrUploading}
+                    className="px-3 py-2 rounded-lg border border-[var(--color-border)] text-xs font-bold hover:bg-[var(--color-bg-tertiary)] transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Upload className="h-3 w-3" /> {qrUploading ? "Uploading…" : store.paymentQrUrl ? "Replace QR" : "Upload QR"}
+                  </button>
+                  <input
+                    id="qr-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleQrUpload}
+                  />
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    Customers scan this to pay you directly. Money goes straight to your bank — QueLess never touches it.
+                  </p>
+                  {qrMessage && (
+                    <p className={`text-xs ${qrMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+                      {qrMessage.text}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-[var(--color-border)]" />
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Payment Instructions</label>
+              <input
+                type="text"
+                maxLength={200}
+                value={paymentInstructions}
+                onChange={(e) => setPaymentInstructions(e.target.value)}
+                placeholder="e.g. Transfer to Maybank 1234567890 (Ali's Nasi Lemak)"
+                className="w-full rounded-lg border px-4 py-2.5 text-sm glass transition-all"
+              />
+            </div>
+
+            <hr className="border-[var(--color-border)]" />
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-[var(--color-text-secondary)] block">Charges</label>
+                <button
+                  type="button"
+                  onClick={addCharge}
+                  disabled={charges.length >= 5}
+                  className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all flex items-center gap-1 disabled:opacity-40"
+                >
+                  <Plus className="h-3 w-3" /> Add charge
+                </button>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)] mb-3">
+                Applied on the subtotal, each calculated independently. Only add SST if your business is SST-registered.
+              </p>
+
+              {charges.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-muted)] italic">
+                  No charges configured — orders total exactly the subtotal.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {charges.map((charge, index) => (
+                    <div key={index} className="grid grid-cols-[1fr_5.5rem_auto_auto] items-center gap-2">
+                      <input
+                        type="text"
+                        maxLength={30}
+                        value={charge.label}
+                        onChange={(e) => updateCharge(index, { label: e.target.value })}
+                        placeholder="e.g. SST"
+                        aria-label={`Charge ${index + 1} label`}
+                        className="w-full rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm bg-transparent"
+                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={charge.rate}
+                          onChange={(e) => updateCharge(index, { rate: parseFloat(e.target.value) || 0 })}
+                          aria-label={`Charge ${index + 1} rate percent`}
+                          className="w-full rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-sm bg-transparent"
+                        />
+                        <span className="text-xs text-[var(--color-text-muted)]">%</span>
+                      </div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={charge.enabled}
+                          onChange={(e) => updateCharge(index, { enabled: e.target.checked })}
+                          className="accent-[var(--color-primary)]"
+                        />
+                        On
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeCharge(index)}
+                        aria-label={`Remove charge ${index + 1}`}
+                        className="p-1.5 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={savingPayments}
+                className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-2.5 rounded-xl text-white font-semibold gradient-primary transition-all hover:opacity-90 disabled:opacity-50"
+              >
+                {savingPayments ? "Saving…" : <><Save className="h-4 w-4" /> Save Payment Settings</>}
+              </button>
+              {paymentsMessage && (
+                <p className={`mt-3 text-sm ${paymentsMessage.type === "success" ? "text-green-500" : "text-red-500"}`}>
+                  {paymentsMessage.text}
                 </p>
               )}
             </div>
