@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import { OrderAgeBadge } from "@/components/dashboard/OrderAgeBadge";
 
 interface OrderItem {
   id: string;
@@ -25,14 +26,19 @@ interface Order {
   notes: string | null;
   createdAt: string;
   orderItems: OrderItem[];
+  paymentMethod?: string;
+  hasProof?: boolean;
 }
 
 const COLUMNS = [
+  { key: "AWAITING_CONFIRMATION", label: "Unconfirmed", color: "var(--color-warning)", nextAction: "Confirm", nextStatus: "PAID", rejectStatus: "CANCELLED" },
   { key: "PAID", label: "New Orders", color: "var(--color-info)", nextAction: "Accept", nextStatus: "ACCEPTED", rejectStatus: "CANCELLED" },
   { key: "ACCEPTED", label: "Accepted", color: "var(--color-warning)", nextAction: "Start Preparing", nextStatus: "PREPARING" },
   { key: "PREPARING", label: "Preparing", color: "var(--color-primary)", nextAction: "Mark Ready", nextStatus: "READY" },
   { key: "READY", label: "Ready", color: "var(--color-success)", nextAction: "Complete", nextStatus: "COMPLETED" },
 ];
+
+const CHIME_REPEAT_MS = 20_000; // how often the alert replays while orders sit unconfirmed
 
 import { useOrderStream } from "@/hooks/useOrderStream";
 
@@ -42,7 +48,9 @@ export default function QueueDashboardPage() {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
-  const prevOrderCount = useRef(0);
+  const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
+  const prevUnconfirmedCount = useRef(0);
+  const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: streamData } = useOrderStream(undefined, storeId || undefined);
@@ -64,11 +72,14 @@ export default function QueueDashboardPage() {
   const fetchOrders = useCallback(async () => {
     if (!storeId) return;
     try {
-      const res = await fetch(`/api/orders?storeId=${storeId}&status=PAID,ACCEPTED,PREPARING,READY`);
+      const res = await fetch(`/api/orders?storeId=${storeId}&status=AWAITING_CONFIRMATION,PAID,ACCEPTED,PREPARING,READY`);
       const data = await res.json();
       if (data.success) {
         setOrders(data.data);
-        prevOrderCount.current = data.data.filter((o: any) => o.status === "PAID").length;
+        // Seed the baseline so page-load with pre-existing unconfirmed orders
+        // doesn't fire the "count rose" chime — the repeating interval (below)
+        // still picks them up on its own cadence.
+        prevUnconfirmedCount.current = data.data.filter((o: Order) => o.status === "AWAITING_CONFIRMATION").length;
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -82,16 +93,34 @@ export default function QueueDashboardPage() {
   // Handle Stream Updates
   useEffect(() => {
     if (streamData && streamData.type === "STORE_QUEUE_UPDATE") {
-      const newOrders = streamData.orders as Order[];
-      const newCount = newOrders.filter((o) => o.status === "PAID").length;
-      
-      if (newCount > prevOrderCount.current && prevOrderCount.current > 0) {
-        playNotificationSound();
-      }
-      prevOrderCount.current = newCount;
-      setOrders(newOrders);
+      setOrders(streamData.orders as Order[]);
     }
   }, [streamData]);
+
+  const unconfirmedCount = orders.filter((o) => o.status === "AWAITING_CONFIRMATION").length;
+
+  // Repeating alert: chime once when the unconfirmed count rises above its
+  // previous value, then replay every CHIME_REPEAT_MS while at least one
+  // order is still waiting. The cleanup always runs before the next effect
+  // invocation (dependency change, StrictMode double-invoke, or unmount), so
+  // there is never more than one interval alive at a time.
+  useEffect(() => {
+    if (unconfirmedCount > prevUnconfirmedCount.current) {
+      playNotificationSound();
+    }
+    prevUnconfirmedCount.current = unconfirmedCount;
+
+    if (unconfirmedCount > 0) {
+      chimeIntervalRef.current = setInterval(playNotificationSound, CHIME_REPEAT_MS);
+    }
+
+    return () => {
+      if (chimeIntervalRef.current) {
+        clearInterval(chimeIntervalRef.current);
+        chimeIntervalRef.current = null;
+      }
+    };
+  }, [unconfirmedCount]);
 
   function playNotificationSound() {
     try {
@@ -227,13 +256,46 @@ export default function QueueDashboardPage() {
                         >
                           #{order.queueNumber || "—"}
                         </div>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          {formatRelativeTime(new Date(order.createdAt))}
-                        </span>
+                        {col.key === "AWAITING_CONFIRMATION" ? (
+                          <OrderAgeBadge createdAt={order.createdAt} />
+                        ) : (
+                          <span className="text-xs text-[var(--color-text-muted)]">
+                            {formatRelativeTime(new Date(order.createdAt))}
+                          </span>
+                        )}
                       </div>
 
                       {/* Customer */}
                       <p className="text-sm font-medium">{order.customerName}</p>
+
+                      {/* Unconfirmed extras: payment method + proof thumbnail */}
+                      {col.key === "AWAITING_CONFIRMATION" && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                            style={{ background: "var(--color-bg-tertiary)", color: "var(--color-text-secondary)" }}
+                          >
+                            {order.paymentMethod === "CASH" ? "Cash" : "QR"}
+                          </span>
+                          {order.hasProof ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedProofOrderId(order.id)}
+                              className="rounded-lg border overflow-hidden shrink-0"
+                              style={{ borderColor: "var(--color-border)" }}
+                              aria-label="View payment receipt"
+                            >
+                              <img
+                                src={`/api/orders/${order.id}/proof`}
+                                alt="Payment receipt thumbnail"
+                                className="h-10 w-10 object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[var(--color-text-muted)]">No receipt yet</span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Items */}
                       <div className="mt-2 space-y-1">
@@ -302,6 +364,35 @@ export default function QueueDashboardPage() {
           );
         })}
       </div>
+
+      {/* Full-size payment receipt viewer */}
+      {expandedProofOrderId && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setExpandedProofOrderId(null)}
+        >
+          <div
+            className="glass w-full max-w-lg rounded-2xl p-4 shadow-2xl animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold">Payment Receipt</h2>
+              <button
+                onClick={() => setExpandedProofOrderId(null)}
+                aria-label="Close"
+                className="font-bold px-2"
+              >
+                ×
+              </button>
+            </div>
+            <img
+              src={`/api/orders/${expandedProofOrderId}/proof`}
+              alt="Payment receipt full size"
+              className="max-h-[70vh] w-full rounded-lg object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
