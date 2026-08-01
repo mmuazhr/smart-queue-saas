@@ -122,6 +122,15 @@ export const updateOrderStatusSchema = z.object({
     "COMPLETED",
     "CANCELLED",
   ]),
+  // The status the client's board believed the order was in when the action
+  // was taken. Required by the generic transition path in PATCH — it's the
+  // compare-and-swap precondition that stops a stale card (SSE can lag a few
+  // seconds) from applying a transition meant for a status the order has
+  // since moved past. Optional here because confirmOrder's AWAITING_CONFIRMATION
+  // → PAID path has its own independent CAS and ignores this field.
+  expectedStatus: z
+    .enum(["AWAITING_CONFIRMATION", "PAID", "ACCEPTED", "PREPARING", "READY"])
+    .optional(),
 });
 
 // ---- Auth Schemas ----

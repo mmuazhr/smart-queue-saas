@@ -43,4 +43,19 @@ describe("serializers", () => {
     const result = toPlainOrder({ id: "o1", subtotal: "1.00", tax: "0", total: "1.00", orderItems: undefined });
     expect(result.orderItems).toBeUndefined();
   });
+
+  // paymentProofUrl is a private-bucket storage key — it must never leave the
+  // server. This is the entire leak-prevention invariant; nothing else guards it.
+  it("strips paymentProofUrl from the serialized order", () => {
+    const order = {
+      id: "o1",
+      subtotal: "1.00",
+      tax: "0",
+      total: "1.00",
+      orderItems: [],
+      paymentProofUrl: "proofs/private/order-o1.jpg",
+    };
+    const result = toPlainOrder(order);
+    expect(result).not.toHaveProperty("paymentProofUrl");
+  });
 });

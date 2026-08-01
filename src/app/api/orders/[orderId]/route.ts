@@ -181,7 +181,7 @@ export async function PATCH(
       );
     }
 
-    const { status: newStatus } = parsed.data;
+    const { status: newStatus, expectedStatus } = parsed.data;
 
     // Fetch order with store ownership info
     const existing = await prisma.order.findUnique({
@@ -201,23 +201,41 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    // Enforce forward-only transition
-    const allowed = VALID_TRANSITIONS[existing.status] ?? [];
+    // Merchant confirmation: this is the only point a queue number is handed out.
+    // `await` is load-bearing — a bare `return` of the promise would let a
+    // rejection escape this try/catch instead of being logged as a 500.
+    // Routes on the freshly-read status; confirmOrder has its own independent
+    // CAS (conditioned on AWAITING_CONFIRMATION at write time) so it's safe
+    // even if this read is already stale by the time it runs.
+    if (existing.status === "AWAITING_CONFIRMATION" && newStatus === "PAID") {
+      return await confirmOrder(orderId, existing.storeId, existing.paymentMethod);
+    }
+
+    // Every other transition requires the client's last-known status and is
+    // applied compare-and-swap style. A fresh server-side re-read is NOT a
+    // substitute: the board can lag its own SSE stream by a few seconds, so
+    // by the time a merchant clicks Reject on a card their UI still shows as
+    // "Unconfirmed", another merchant may have already confirmed it — a fresh
+    // read at this point would show PAID, and PAID→CANCELLED is a legitimate
+    // transition in isolation, but not the one this merchant actually meant
+    // to make. Only the client's own belief about the order's status, proven
+    // against the row it's still true, may authorize the transition.
+    if (!expectedStatus) {
+      return NextResponse.json(
+        { success: false, error: "expectedStatus is required" },
+        { status: 400 }
+      );
+    }
+
+    const allowed = VALID_TRANSITIONS[expectedStatus] ?? [];
     if (!allowed.includes(newStatus)) {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid transition: ${existing.status} → ${newStatus}. Allowed: ${allowed.join(", ") || "none"}`,
+          error: `Invalid transition: ${expectedStatus} → ${newStatus}. Allowed: ${allowed.join(", ") || "none"}`,
         },
         { status: 422 }
       );
-    }
-
-    // Merchant confirmation: this is the only point a queue number is handed out.
-    // `await` is load-bearing — a bare `return` of the promise would let a
-    // rejection escape this try/catch instead of being logged as a 500.
-    if (existing.status === "AWAITING_CONFIRMATION" && newStatus === "PAID") {
-      return await confirmOrder(orderId, existing.storeId, existing.paymentMethod);
     }
 
     const timestampFields: Record<string, Date> = {};
@@ -227,21 +245,41 @@ export async function PATCH(
     if (newStatus === "COMPLETED") timestampFields.completedAt = new Date();
 
     // Collecting a completed cash order means it was paid at the counter —
-    // otherwise the tracking page nags "please pay" forever.
+    // otherwise the tracking page nags "please pay" forever. paymentMethod
+    // itself never changes after order creation, so reading it off the
+    // pre-CAS `existing` row (rather than expectedStatus) is safe.
     const settlesCash =
       newStatus === "COMPLETED" &&
       existing.paymentMethod === "CASH" &&
       existing.paymentStatus === "PENDING";
 
-    const updated = await prisma.order.update({
-      where: { id: orderId },
+    const { count } = await prisma.order.updateMany({
+      where: { id: orderId, status: expectedStatus },
       data: {
         status: newStatus,
         ...timestampFields,
         ...(settlesCash ? { paymentStatus: "PAID", paidAt: new Date() } : {}),
       },
+    });
+
+    if (count === 0) {
+      // Lost the race — the order moved out of expectedStatus between the
+      // client's last fetch and this request. Nothing was written.
+      return NextResponse.json(
+        { success: false, error: "This order was already updated elsewhere. Refresh and try again." },
+        { status: 409 }
+      );
+    }
+
+    const updated = await prisma.order.findUnique({
+      where: { id: orderId },
       include: { store: true },
     });
+
+    if (!updated) {
+      logger.error("Update committed but order vanished on re-read:", orderId);
+      return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
+    }
 
     // Send notification outside transaction
     if (newStatus === "READY") {

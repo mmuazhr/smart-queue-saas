@@ -21,6 +21,14 @@ interface SeriesRow {
   revenue: number;
 }
 
+// AWAITING_CONFIRMATION orders haven't been confirmed by the merchant — no
+// payment has been taken (QR) and no queue number issued yet (see
+// confirmOrder in api/orders/[orderId]/route.ts). Left un-rejected they can
+// sit in this status indefinitely, so every revenue/order-count aggregate
+// must exclude them the same way it already excludes CANCELLED, or an
+// abandoned cart inflates the merchant's numbers.
+const UNCONFIRMED_OR_CANCELLED = ["AWAITING_CONFIRMATION", "CANCELLED"] as const;
+
 /**
  * Buckets orders inside the window entirely in the database — 24 or 30 rows come
  * back, never the underlying orders. Offsets are measured from the window start
@@ -42,7 +50,7 @@ async function fetchSeriesRows(
       coalesce(sum(o.total), 0)::float8 AS revenue
     FROM orders o
     WHERE o.store_id = ${storeId}
-      AND o.status <> 'CANCELLED'
+      AND o.status NOT IN (${Prisma.join(UNCONFIRMED_OR_CANCELLED)})
       AND o.created_at >= ${analyticsWindow.current.start}
       AND o.created_at <= ${analyticsWindow.current.end}
     GROUP BY 1
@@ -85,7 +93,7 @@ export async function GET(request: NextRequest) {
     // the chart can never drift onto different windows.
     const inWindow = (w: { start: Date; end: Date }) => ({
       storeId: store.id,
-      status: { not: "CANCELLED" },
+      status: { notIn: [...UNCONFIRMED_OR_CANCELLED] },
       createdAt: { gte: w.start, lte: w.end },
     });
 
@@ -99,7 +107,7 @@ export async function GET(request: NextRequest) {
         orderBy: { _sum: { quantity: "desc" } },
         take: 5,
       }),
-      prisma.order.count({ where: { storeId: store.id, status: { not: "CANCELLED" } } }),
+      prisma.order.count({ where: { storeId: store.id, status: { notIn: [...UNCONFIRMED_OR_CANCELLED] } } }),
       fetchSeriesRows(store.id, analyticsWindow),
     ]);
 

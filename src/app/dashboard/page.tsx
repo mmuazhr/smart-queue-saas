@@ -140,7 +140,11 @@ export default function QueueDashboardPage() {
     } catch {/* ignore */}
   }
 
-  async function updateOrderStatus(orderId: string, status: string) {
+  // expectedStatus is the column the card was sitting in when the merchant
+  // clicked — the server rejects the transition (409) if the order has since
+  // moved elsewhere (SSE can lag a few seconds), rather than trusting a fresh
+  // server-side re-read that could already reflect someone else's action.
+  async function updateOrderStatus(orderId: string, status: string, expectedStatus: string) {
     if (updatingOrderId) return; // one transition at a time
     setUpdatingOrderId(orderId);
     setActionError(null);
@@ -148,10 +152,16 @@ export default function QueueDashboardPage() {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, expectedStatus }),
       });
       if (res.ok) {
         await fetchOrders();
+      } else if (res.status === 409) {
+        // Board was stale — refresh to show what actually happened instead
+        // of leaving a phantom card the merchant could act on again.
+        await fetchOrders();
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "This order was already updated elsewhere — the board has been refreshed.");
       } else {
         const data = await res.json().catch(() => null);
         setActionError(data?.error || "Could not update the order — please try again.");
@@ -161,6 +171,11 @@ export default function QueueDashboardPage() {
     } finally {
       setUpdatingOrderId(null);
     }
+  }
+
+  function rejectOrder(order: Order, expectedStatus: string) {
+    if (!window.confirm(`Cancel order #${order.queueNumber ?? "—"}? This can't be undone.`)) return;
+    updateOrderStatus(order.id, "CANCELLED", expectedStatus);
   }
 
   if (loading) {
@@ -342,7 +357,7 @@ export default function QueueDashboardPage() {
                       {/* Actions */}
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => updateOrderStatus(order.id, col.nextStatus)}
+                          onClick={() => updateOrderStatus(order.id, col.nextStatus, col.key)}
                           disabled={updatingOrderId !== null}
                           className="flex-1 rounded-lg py-2 text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                           style={{ background: col.color }}
@@ -351,9 +366,7 @@ export default function QueueDashboardPage() {
                         </button>
                         {col.rejectStatus && (
                           <button
-                            onClick={() =>
-                              updateOrderStatus(order.id, col.rejectStatus!)
-                            }
+                            onClick={() => rejectOrder(order, col.key)}
                             disabled={updatingOrderId !== null}
                             className="rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-[var(--color-error-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
                             style={{
