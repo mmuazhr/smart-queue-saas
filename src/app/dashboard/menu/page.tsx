@@ -363,7 +363,7 @@ export default function MenuManagementPage() {
                               });
                               const data = await res.json();
                               if (data.success) {
-                                setEditingItem({ ...editingItem, imageUrl: data.url });
+                                setEditingItem({ ...editingItem, imageUrl: data.data.url });
                               } else {
                                 alert(data.error || "Upload failed");
                               }
