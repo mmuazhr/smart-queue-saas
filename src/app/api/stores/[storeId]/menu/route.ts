@@ -9,6 +9,9 @@ import { createMenuItemSchema } from "@/lib/validators";
 import { toTitleCase } from "@/lib/format";
 
 // GET /api/stores/[storeId]/menu — List menu items grouped by category
+// Intentionally unauthenticated: menu contents are public data (the
+// storefront shows them to anonymous customers), so no ownership check is
+// required here — this is not an oversight.
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ storeId: string }> }
@@ -27,7 +30,11 @@ export async function GET(
   const categories = await prisma.category.findMany({
     where: { storeId, isActive: true },
     include: {
+      // Defense in depth: scope by storeId even though category is already
+      // storeId-scoped above, so a future regression in category ownership
+      // can't surface another store's items here.
       menuItems: {
+        where: { storeId },
         orderBy: { sortOrder: "asc" },
       },
     },
@@ -75,6 +82,22 @@ export async function POST(
         { success: false, error: "Validation failed", errors: fieldErrors },
         { status: 400 }
       );
+    }
+
+    // A categoryId from another store must never be accepted — the route
+    // only checks storeId ownership above, so a cross-store categoryId
+    // would otherwise let this item render inside another store's menu.
+    if (parsed.data.categoryId) {
+      const category = await prisma.category.findFirst({
+        where: { id: parsed.data.categoryId, storeId },
+        select: { id: true },
+      });
+      if (!category) {
+        return NextResponse.json(
+          { success: false, error: "categoryId does not belong to this store" },
+          { status: 400 }
+        );
+      }
     }
 
     const item = await prisma.menuItem.create({

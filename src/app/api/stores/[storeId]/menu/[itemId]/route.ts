@@ -35,6 +35,22 @@ export async function PUT(
       );
     }
 
+    // A categoryId from another store must never be accepted — the route
+    // only checks storeId ownership above, so a cross-store categoryId
+    // would otherwise let this item render inside another store's menu.
+    if (parsed.data.categoryId) {
+      const category = await prisma.category.findFirst({
+        where: { id: parsed.data.categoryId, storeId },
+        select: { id: true },
+      });
+      if (!category) {
+        return NextResponse.json(
+          { success: false, error: "categoryId does not belong to this store" },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await prisma.menuItem.update({
       where: { id: itemId, storeId }, // Ensure it belongs to the store
       data: {

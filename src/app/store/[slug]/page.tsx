@@ -28,15 +28,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function StorePage({ params }: Props) {
   const { slug } = await params;
 
+  // A category's menuItems relation can't reference the parent store's own
+  // id inside a single findUnique(where: { slug }) query, so resolve the id
+  // first. This lets the nested where scope menuItems by storeId directly
+  // (defense in depth: categories are already storeId-scoped, but this
+  // ensures a future regression in category ownership can't leak another
+  // store's items onto this public storefront).
+  const storeRef = await prisma.store.findUnique({ where: { slug }, select: { id: true } });
+
+  if (!storeRef) {
+    notFound();
+  }
+
   const store = await prisma.store.findUnique({
-    where: { slug },
+    where: { id: storeRef.id },
     include: {
       categories: {
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
         include: {
           menuItems: {
-            where: { isAvailable: true },
+            where: { isAvailable: true, storeId: storeRef.id },
             orderBy: { sortOrder: "asc" },
           },
         },
