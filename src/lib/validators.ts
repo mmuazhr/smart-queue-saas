@@ -77,6 +77,8 @@ export const createCategorySchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
 });
 
+export const updateCategorySchema = createCategorySchema.partial();
+
 // ---- Menu Item Schemas ----
 
 export const createMenuItemSchema = z.object({
@@ -189,6 +191,7 @@ export type AdminStoreStatusInput = z.infer<typeof adminStoreStatusSchema>;
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;
 export type UpdateStoreInput = z.infer<typeof updateStoreSchema>;
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type CreateMenuItemInput = z.infer<typeof createMenuItemSchema>;
 export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;

@@ -1,19 +1,19 @@
 // =============================================================================
-// Menu Item Detail API Routes — Update & Delete
+// Category Detail API Routes — Rename & Delete
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { updateMenuItemSchema } from "@/lib/validators";
+import { updateCategorySchema } from "@/lib/validators";
 import { toTitleCase } from "@/lib/format";
 
-// PUT /api/stores/[storeId]/menu/[itemId]
+// PUT /api/stores/[storeId]/categories/[categoryId]
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ storeId: string; itemId: string }> }
+  { params }: { params: Promise<{ storeId: string; categoryId: string }> }
 ) {
-  const { storeId, itemId } = await params;
+  const { storeId, categoryId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -26,7 +26,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const parsed = updateMenuItemSchema.safeParse(body);
+    const parsed = updateCategorySchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -35,8 +35,8 @@ export async function PUT(
       );
     }
 
-    const updated = await prisma.menuItem.update({
-      where: { id: itemId, storeId }, // Ensure it belongs to the store
+    const updated = await prisma.category.update({
+      where: { id: categoryId, storeId }, // Ensure it belongs to the store
       data: {
         ...parsed.data,
         ...(parsed.data.name !== undefined && { name: toTitleCase(parsed.data.name) }),
@@ -45,7 +45,7 @@ export async function PUT(
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
-    console.error("Update menu item error:", error);
+    console.error("Update category error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
@@ -53,12 +53,18 @@ export async function PUT(
   }
 }
 
-// DELETE /api/stores/[storeId]/menu/[itemId]
+// DELETE /api/stores/[storeId]/categories/[categoryId]
+//
+// Deleting a category does not delete its menu items — the `menu_items` FK
+// (see prisma/schema.prisma, MenuItem.category) is ON DELETE SET NULL, so
+// Postgres un-parents every item in this category to categoryId = null as
+// part of the same DELETE statement. That's already atomic; no separate
+// updateMany + delete transaction is needed.
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ storeId: string; itemId: string }> }
+  { params }: { params: Promise<{ storeId: string; categoryId: string }> }
 ) {
-  const { storeId, itemId } = await params;
+  const { storeId, categoryId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -70,12 +76,12 @@ export async function DELETE(
   }
 
   try {
-    await prisma.menuItem.delete({
-      where: { id: itemId, storeId },
+    await prisma.category.delete({
+      where: { id: categoryId, storeId },
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete menu item error:", error);
+    console.error("Delete category error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

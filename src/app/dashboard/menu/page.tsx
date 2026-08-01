@@ -33,6 +33,7 @@ export default function MenuManagementPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   const fetchMenu = useCallback(async () => {
     if (!storeId) return;
@@ -120,23 +121,52 @@ export default function MenuManagementPage() {
     }
   }
 
-  async function handleAddCategory(e: React.FormEvent) {
+  function openCategoryModal(category?: Category) {
+    setEditingCategoryId(category?.id ?? null);
+    setNewCategoryName(category?.name ?? "");
+    setIsCategoryModalOpen(true);
+  }
+
+  async function handleCategorySubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!storeId || !newCategoryName) return;
 
+    const method = editingCategoryId ? "PUT" : "POST";
+    const url = editingCategoryId
+      ? `/api/stores/${storeId}/categories/${editingCategoryId}`
+      : `/api/stores/${storeId}/categories`;
+
     try {
-      const res = await fetch(`/api/stores/${storeId}/categories`, {
-        method: "POST",
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newCategoryName }),
       });
       if (res.ok) {
         setIsCategoryModalOpen(false);
+        setEditingCategoryId(null);
         setNewCategoryName("");
         fetchMenu();
       }
     } catch (error) {
-      console.error("Failed to add category:", error);
+      console.error("Failed to save category:", error);
+    }
+  }
+
+  async function deleteCategory(category: Category) {
+    if (!storeId) return;
+    const confirmed = window.confirm(
+      `Delete category "${category.name}"? Its items will be kept and shown without a category.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/stores/${storeId}/categories/${category.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) fetchMenu();
+    } catch (error) {
+      console.error("Failed to delete category:", error);
     }
   }
 
@@ -162,8 +192,8 @@ export default function MenuManagementPage() {
           <p className="text-sm text-[var(--color-text-muted)]">Organize your categories and menu items</p>
         </div>
         <div className="flex gap-3">
-          <button 
-            onClick={() => setIsCategoryModalOpen(true)}
+          <button
+            onClick={() => openCategoryModal()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-sm font-medium"
           >
             <Plus className="h-4 w-4" /> Add Category
@@ -189,6 +219,20 @@ export default function MenuManagementPage() {
               <span className="text-xs text-[var(--color-text-muted)] font-medium uppercase tracking-wider">
                 {category.menuItems.length} Items
               </span>
+              <button
+                onClick={() => openCategoryModal(category)}
+                aria-label={`Rename ${category.name}`}
+                className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => deleteCategory(category)}
+                aria-label={`Delete ${category.name}`}
+                className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--color-text-muted)] hover:text-red-500 transition-all"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -443,33 +487,37 @@ export default function MenuManagementPage() {
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="glass w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-slide-up">
-            <h2 className="text-xl font-bold mb-6">Add New Category</h2>
-            <form onSubmit={handleAddCategory} className="space-y-4">
+            <h2 className="text-xl font-bold mb-6">{editingCategoryId ? "Rename Category" : "Add New Category"}</h2>
+            <form onSubmit={handleCategorySubmit} className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Category Name</label>
-                <input 
+                <input
                   required
                   autoFocus
-                  type="text" 
+                  type="text"
                   placeholder="e.g. Western Food, Desserts"
-                  value={newCategoryName} 
+                  value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   className="w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm bg-transparent"
                 />
               </div>
               <div className="flex gap-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setIsCategoryModalOpen(false)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCategoryModalOpen(false);
+                    setEditingCategoryId(null);
+                    setNewCategoryName("");
+                  }}
                   className="flex-1 px-4 py-2 rounded-xl border border-[var(--color-border)] font-medium"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="flex-1 px-4 py-2 rounded-xl text-white font-medium gradient-primary"
                 >
-                  Create
+                  {editingCategoryId ? "Save" : "Create"}
                 </button>
               </div>
             </form>
