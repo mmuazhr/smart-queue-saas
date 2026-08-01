@@ -49,6 +49,9 @@ model Store {
   qrCodeUrl           String?  @map("qr_code_url")
   paymentGateway      String?  @map("payment_gateway")
   gatewayMerchantId   String?  @map("gateway_merchant_id")
+  paymentQrUrl        String?  @map("payment_qr_url")
+  paymentInstructions String?  @map("payment_instructions")
+  charges             Json?
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -112,6 +115,10 @@ model Order {
   paymentIntentId  String?   @map("payment_intent_id")
   paymentGateway   String?   @map("payment_gateway")
   paymentStatus    String    @default("PENDING") @map("payment_status")
+  paymentMethod    String    @default("QR") @map("payment_method")
+  paymentProofUrl  String?   @map("payment_proof_url")
+  confirmedAt      DateTime? @map("confirmed_at")
+  chargeBreakdown  Json?     @map("charge_breakdown")
   notes            String?
   paidAt           DateTime? @map("paid_at")
   acceptedAt       DateTime? @map("accepted_at")
