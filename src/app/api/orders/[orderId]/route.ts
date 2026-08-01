@@ -253,13 +253,16 @@ export async function PATCH(
       existing.paymentMethod === "CASH" &&
       existing.paymentStatus === "PENDING";
 
+    // Hoisted so the degraded response below can echo exactly what was committed.
+    const changes = {
+      status: newStatus,
+      ...timestampFields,
+      ...(settlesCash ? { paymentStatus: "PAID", paidAt: new Date() } : {}),
+    };
+
     const { count } = await prisma.order.updateMany({
       where: { id: orderId, status: expectedStatus },
-      data: {
-        status: newStatus,
-        ...timestampFields,
-        ...(settlesCash ? { paymentStatus: "PAID", paidAt: new Date() } : {}),
-      },
+      data: changes,
     });
 
     if (count === 0) {
@@ -271,32 +274,41 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { store: true },
-    });
-
-    if (!updated) {
-      logger.error("Update committed but order vanished on re-read:", orderId);
-      return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
-    }
-
-    // Send notification outside transaction
-    if (newStatus === "READY") {
-      try {
-        await NotificationService.sendOrderReady({
-          recipientPhone: updated.customerPhone,
-          customerName: updated.customerName,
-          storeName: updated.store.name,
-          orderNumber: updated.queueNumber ?? 0,
-          orderUrl: `${process.env.NEXTAUTH_URL}/store/${updated.store.slug}/order/${updated.id}`,
-        });
-      } catch (notifErr) {
-        logger.error("Notification failed (non-fatal):", notifErr);
+    // Past this point the transition is COMMITTED. The re-read (and the READY
+    // notification it feeds) only exist to build a richer response, so they
+    // must never turn a successful update into a failure: letting a re-read
+    // error reach the outer catch would report 500 for a transition that
+    // really did land, and the merchant's retry would then hit a 409/422 on
+    // an order they were never told had already moved. Mirrors confirmOrder's
+    // degraded-response pattern above.
+    try {
+      const updated = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { store: true },
+      });
+      if (updated) {
+        // Send notification outside transaction
+        if (newStatus === "READY") {
+          try {
+            await NotificationService.sendOrderReady({
+              recipientPhone: updated.customerPhone,
+              customerName: updated.customerName,
+              storeName: updated.store.name,
+              orderNumber: updated.queueNumber ?? 0,
+              orderUrl: `${process.env.NEXTAUTH_URL}/store/${updated.store.slug}/order/${updated.id}`,
+            });
+          } catch (notifErr) {
+            logger.error("Notification failed (non-fatal):", notifErr);
+          }
+        }
+        return NextResponse.json({ success: true, data: toPlainOrder(updated) });
       }
+      logger.error("Update committed but order vanished on re-read:", orderId);
+    } catch (readError) {
+      logger.error("Update committed but re-read failed (non-fatal):", readError);
     }
 
-    return NextResponse.json({ success: true, data: toPlainOrder(updated) });
+    return NextResponse.json({ success: true, data: { id: orderId, ...changes } });
   } catch (error) {
     logger.error("Update order error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
