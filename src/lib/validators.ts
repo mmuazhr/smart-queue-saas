@@ -61,7 +61,26 @@ export const createStoreSchema = z.object({
     .optional(),
   gatewayMerchantId: z.string().optional(),
   paymentInstructions: z.string().max(200).optional(),
-  paymentQrUrl: z.string().url().optional(),
+  // The QR is rendered as an <img src> on the customer's payment screen.
+  // z.string().url() alone accepts javascript:/data:/arbitrary-http URLs; a
+  // legitimate value is always an https Supabase Storage URL produced by
+  // /api/upload, so restrict to that origin — blocks hostile schemes and
+  // external/tracking URLs a malicious merchant could otherwise show customers.
+  paymentQrUrl: z
+    .string()
+    .url()
+    .refine(
+      (u) => {
+        try {
+          const parsed = new URL(u);
+          return parsed.protocol === "https:" && parsed.hostname.endsWith(".supabase.co");
+        } catch {
+          return false;
+        }
+      },
+      { message: "Payment QR must be an uploaded image URL" }
+    )
+    .optional(),
   charges: storeChargesSchema.optional(),
 });
 
@@ -84,7 +103,9 @@ export const updateCategorySchema = createCategorySchema.partial();
 export const createMenuItemSchema = z.object({
   name: z.string().min(1, "Item name is required").max(100),
   description: z.string().max(300).optional(),
-  price: z.number().positive("Price must be greater than 0"),
+  // Max mirrors the Decimal(10,2) column ceiling (99,999,999.99). Without it,
+  // a larger value overflows Postgres and surfaces as an unhandled 500.
+  price: z.number().positive("Price must be greater than 0").max(99999999, "Price is too large"),
   categoryId: z.string().uuid().optional().nullable(),
   imageUrl: optionalImageUrlSchema,
   prepTimeMins: z.number().int().min(1).max(120).optional().nullable(),
