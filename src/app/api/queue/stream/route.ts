@@ -15,6 +15,7 @@ const ORDER_PUBLIC_FIELDS = {
   id: true,
   queueNumber: true,
   status: true,
+  paymentStatus: true,
   estimatedWaitMins: true,
   paidAt: true,
   acceptedAt: true,

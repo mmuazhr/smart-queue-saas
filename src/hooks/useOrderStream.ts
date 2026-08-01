@@ -9,6 +9,7 @@ export interface OrderStreamUpdate {
   id: string;
   queueNumber: number | null;
   status: string;
+  paymentStatus: string;
   estimatedWaitMins: number | null;
   paidAt: string | null;
   acceptedAt: string | null;

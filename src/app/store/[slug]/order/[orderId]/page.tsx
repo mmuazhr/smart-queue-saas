@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useOrderStream } from "@/hooks/useOrderStream";
+import PaymentPanel from "@/components/customer/PaymentPanel";
 
 interface OrderItem {
   id: string;
@@ -29,9 +30,16 @@ interface Order {
   customerName: string;
   paymentMethod: string;
   paymentStatus: string;
+  hasProof: boolean;
   createdAt: string;
   orderItems: OrderItem[];
-  store: { name: string; address: string | null; phone: string | null };
+  store: {
+    name: string;
+    address: string | null;
+    phone: string | null;
+    paymentQrUrl: string | null;
+    paymentInstructions: string | null;
+  };
 }
 
 /** The install prompt event is not in lib.dom yet. */
@@ -89,9 +97,17 @@ export default function OrderTrackingPage() {
 
   useEffect(() => {
     if (streamData && (streamData as { type: string }).type === "ORDER_UPDATE") {
-      const update = streamData as { status: string; queueNumber: number; estimatedWaitMins: number };
+      const update = streamData as { status: string; queueNumber: number; estimatedWaitMins: number; paymentStatus: string };
       setOrder((prev) =>
-        prev ? { ...prev, status: update.status, queueNumber: update.queueNumber, estimatedWaitMins: update.estimatedWaitMins } : null
+        prev
+          ? {
+              ...prev,
+              status: update.status,
+              queueNumber: update.queueNumber,
+              estimatedWaitMins: update.estimatedWaitMins,
+              paymentStatus: update.paymentStatus,
+            }
+          : null
       );
     }
   }, [streamData]);
@@ -118,7 +134,10 @@ export default function OrderTrackingPage() {
   const currentStepIndex = steps.findIndex((s) => s.key === order.status);
   const isCancelled = order.status === "CANCELLED";
   const isCompleted = order.status === "COMPLETED";
-  const isCashPending = order.paymentMethod === "CASH" && order.paymentStatus === "PENDING";
+  const isAwaitingConfirmation = order.status === "AWAITING_CONFIRMATION";
+  // The payment panel already covers "pay at counter" messaging while awaiting
+  // confirmation — showing this banner too would duplicate it.
+  const isCashPending = order.paymentMethod === "CASH" && order.paymentStatus === "PENDING" && !isAwaitingConfirmation;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
@@ -148,25 +167,38 @@ export default function OrderTrackingPage() {
           </div>
         )}
 
-        {/* Queue number */}
-        <section className={`glass rounded-3xl p-8 text-center shadow-2xl transition-all border-b-4 ${order.status === "READY" ? "border-green-500 animate-bounce-slow" : "border-[var(--color-primary)]"}`}>
-          <p className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-widest mb-1">Your Queue Number</p>
-          <div className="text-7xl font-black text-[var(--color-primary)] mb-4 drop-shadow-xl">
-            {order.queueNumber || "..."}
-          </div>
-          <div className="h-px w-12 bg-[var(--color-border)] mx-auto mb-4" />
-          <div className="space-y-1">
-            <p className="text-sm font-bold text-[var(--color-text)]">
-              {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === "READY" ? "It's Ready!" : "Please wait…"}
-            </p>
-            {!isCancelled && !isCompleted && order.status !== "READY" && (
-              <p className="text-xs text-[var(--color-text-muted)] flex items-center justify-center gap-1.5">
-                <Clock className="h-3 w-3" /> Estimated Wait:{" "}
-                <span className="text-[var(--color-primary)] font-bold">{formatWaitTime(order.estimatedWaitMins || 0)}</span>
+        {/* Queue number, or the payment panel while awaiting merchant confirmation */}
+        {isAwaitingConfirmation ? (
+          <section className="space-y-4">
+            <div className="text-center">
+              <p className="text-lg font-black text-[var(--color-text)]">Almost there — complete your payment</p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">Your queue number is issued once the shop confirms.</p>
+            </div>
+            <PaymentPanel
+              order={order}
+              onProofUploaded={() => setOrder((prev) => (prev ? { ...prev, hasProof: true } : null))}
+            />
+          </section>
+        ) : (
+          <section className={`glass rounded-3xl p-8 text-center shadow-2xl transition-all duration-500 ${order.status === "READY" ? "ring-2 ring-green-500/50 bg-green-500/5" : ""}`}>
+            <p className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-widest mb-1">Your Queue Number</p>
+            <div className="text-7xl font-black text-[var(--color-primary)] mb-4 drop-shadow-xl">
+              {order.queueNumber || "..."}
+            </div>
+            <div className="h-px w-12 bg-[var(--color-border)] mx-auto mb-4" />
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-[var(--color-text)]">
+                {isCancelled ? "Order Cancelled" : isCompleted ? "Order Completed" : order.status === "READY" ? "It's Ready!" : "Please wait…"}
               </p>
-            )}
-          </div>
-        </section>
+              {!isCancelled && !isCompleted && order.status !== "READY" && (
+                <p className="text-xs text-[var(--color-text-muted)] flex items-center justify-center gap-1.5">
+                  <Clock className="h-3 w-3" /> Estimated Wait:{" "}
+                  <span className="text-[var(--color-primary)] font-bold">{formatWaitTime(order.estimatedWaitMins || 0)}</span>
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Receipt — completed orders only */}
         {isCompleted && (
@@ -216,8 +248,8 @@ export default function OrderTrackingPage() {
           </section>
         )}
 
-        {/* Stepper */}
-        {!isCancelled && !isCompleted && (
+        {/* Stepper — suppressed while awaiting confirmation, no AWAITING_CONFIRMATION step exists */}
+        {!isCancelled && !isCompleted && !isAwaitingConfirmation && (
           <section className="space-y-6 px-2">
             <div className="relative">
               <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[var(--color-border)]" />
