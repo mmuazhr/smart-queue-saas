@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronUp, Image as ImageIcon, Loader2 } from "lucide-react";
 import { formatPrice, isHttpUrl } from "@/lib/utils";
+import { normalizeImageForUpload, mapUploadError, ImageDecodeError, IMAGE_DECODE_ERROR_MESSAGE } from "@/lib/client-image";
 
 interface MenuItem {
   id: string;
@@ -34,6 +35,13 @@ export default function MenuManagementPage() {
   const [editingItem, setEditingItem] = useState<Partial<MenuItem> | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function openItemModal(item: Partial<MenuItem>) {
+    setUploadError(null);
+    setEditingItem(item);
+    setIsItemModalOpen(true);
+  }
 
   const fetchMenu = useCallback(async () => {
     if (!storeId) return;
@@ -198,11 +206,8 @@ export default function MenuManagementPage() {
           >
             <Plus className="h-4 w-4" /> Add Category
           </button>
-          <button 
-            onClick={() => {
-              setEditingItem({ name: "", price: 0, isAvailable: true, categoryId: categories[0]?.id || null, imageUrl: "" });
-              setIsItemModalOpen(true);
-            }}
+          <button
+            onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: categories[0]?.id || null, imageUrl: "" })}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-medium gradient-primary transition-all hover:opacity-90 text-sm"
           >
             <Plus className="h-4 w-4" /> Add Item
@@ -248,7 +253,7 @@ export default function MenuManagementPage() {
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
                       <button
-                        onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
+                        onClick={() => openItemModal({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" })}
                         aria-label={`Edit ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
@@ -288,11 +293,8 @@ export default function MenuManagementPage() {
                 </div>
               ))}
               
-              <button 
-                onClick={() => {
-                  setEditingItem({ name: "", price: 0, isAvailable: true, categoryId: category.id, imageUrl: "" });
-                  setIsItemModalOpen(true);
-                }}
+              <button
+                onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: category.id, imageUrl: "" })}
                 className="rounded-2xl border-2 border-dashed border-[var(--color-border)] p-4 flex flex-col items-center justify-center gap-2 text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-all min-h-[160px]"
               >
                 <Plus className="h-6 w-6" />
@@ -318,7 +320,7 @@ export default function MenuManagementPage() {
                     </div>
                     <div className="flex flex-col gap-1 ml-2">
                       <button
-                        onClick={() => { setEditingItem({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" }); setIsItemModalOpen(true); }}
+                        onClick={() => openItemModal({ ...item, imageUrl: isHttpUrl(item.imageUrl) ? item.imageUrl : "" })}
                         aria-label={`Edit ${item.name}`}
                         className="p-1.5 rounded-lg hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-all"
                       >
@@ -395,12 +397,16 @@ export default function MenuManagementPage() {
                           className="hidden"
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
+                            e.target.value = ""; // allow re-selecting the same file after an error
                             if (!file) return;
 
-                            const formData = new FormData();
-                            formData.append("file", file);
+                            setUploadError(null);
 
                             try {
+                              const normalized = await normalizeImageForUpload(file, { kind: "photo" });
+                              const formData = new FormData();
+                              formData.append("file", normalized);
+
                               const res = await fetch("/api/upload", {
                                 method: "POST",
                                 body: formData,
@@ -409,11 +415,15 @@ export default function MenuManagementPage() {
                               if (data.success) {
                                 setEditingItem({ ...editingItem, imageUrl: data.data.url });
                               } else {
-                                alert(data.error || "Upload failed");
+                                setUploadError(mapUploadError(data.error));
                               }
                             } catch (err) {
-                              console.error("Upload failed", err);
-                              alert("An unexpected error occurred during upload.");
+                              if (err instanceof ImageDecodeError) {
+                                setUploadError(IMAGE_DECODE_ERROR_MESSAGE);
+                              } else {
+                                console.error("Upload failed", err);
+                                setUploadError("An unexpected error occurred during upload.");
+                              }
                             }
                           }}
                         />
@@ -428,6 +438,7 @@ export default function MenuManagementPage() {
                     </div>
                   </div>
                   <p className="text-[10px] text-[var(--color-text-muted)] italic">Square photos (e.g. 500x500) look best on the menu.</p>
+                  {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
                 </div>
               </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import QRCode from "qrcode";
 import { Save, Download, QrCode, Clock, Store as StoreIcon, MapPin, Phone, MessageSquare, CalendarClock, Copy, Check, ExternalLink, Rocket, Wallet, Upload, Plus, Trash2 } from "lucide-react";
 import { storeChargesSchema, parseStoreCharges } from "@/lib/charges";
+import { normalizeImageForUpload, mapUploadError, ImageDecodeError, IMAGE_DECODE_ERROR_MESSAGE } from "@/lib/client-image";
 
 // Charges are edited as raw strings, not numbers — a controlled <input
 // type="number"> that coerces on every keystroke (parseFloat(...) || 0)
@@ -231,13 +232,14 @@ export default function SettingsPage() {
     setQrMessage(null);
 
     try {
+      const normalized = await normalizeImageForUpload(file, { kind: "qr" });
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", normalized);
       formData.append("kind", "qr");
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       const uploadData = await uploadRes.json();
       if (!uploadData.success) {
-        setQrMessage({ type: "error", text: uploadData.error || "Upload failed." });
+        setQrMessage({ type: "error", text: mapUploadError(uploadData.error) });
         return;
       }
 
@@ -254,7 +256,11 @@ export default function SettingsPage() {
         setQrMessage({ type: "error", text: putData.error || "Failed to save QR code." });
       }
     } catch (error) {
-      setQrMessage({ type: "error", text: "Something went wrong." });
+      if (error instanceof ImageDecodeError) {
+        setQrMessage({ type: "error", text: IMAGE_DECODE_ERROR_MESSAGE });
+      } else {
+        setQrMessage({ type: "error", text: "Something went wrong." });
+      }
     } finally {
       setQrUploading(false);
     }

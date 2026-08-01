@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, Upload, Banknote } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { normalizeImageForUpload, ImageDecodeError, IMAGE_DECODE_ERROR_MESSAGE } from "@/lib/client-image";
 
 interface PaymentPanelOrder {
   id: string;
@@ -40,10 +41,11 @@ export default function PaymentPanel({ order, onProofUploaded }: Props) {
     setIsUploading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
+      const normalized = await normalizeImageForUpload(file, { kind: "photo" });
+      const formData = new FormData();
+      formData.append("file", normalized);
+
       const res = await fetch(`/api/orders/${order.id}/proof`, {
         method: "PATCH",
         body: formData,
@@ -59,8 +61,12 @@ export default function PaymentPanel({ order, onProofUploaded }: Props) {
       } else {
         setError(PROOF_ERROR_MESSAGES[data.error as string] ?? "Upload failed. Please try again.");
       }
-    } catch {
-      setError("Something went wrong. Check your connection.");
+    } catch (err) {
+      if (err instanceof ImageDecodeError) {
+        setError(IMAGE_DECODE_ERROR_MESSAGE);
+      } else {
+        setError("Something went wrong. Check your connection.");
+      }
     } finally {
       setIsUploading(false);
     }
