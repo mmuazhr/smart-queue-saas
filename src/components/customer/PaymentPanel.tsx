@@ -114,7 +114,7 @@ export default function PaymentPanel({ order, onProofUploaded }: Props) {
       {order.hasProof ? (
         <div className="flex items-center justify-center gap-2 py-3 text-green-500">
           <CheckCircle2 className="h-5 w-5" />
-          <p className="text-sm font-bold">Receipt sent — waiting for the shop to confirm.</p>
+          <p className="text-sm font-bold">Please show the payment proof at the counter to confirm your order.</p>
         </div>
       ) : (
         <div className="space-y-3">

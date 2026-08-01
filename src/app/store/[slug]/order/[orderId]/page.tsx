@@ -136,6 +136,9 @@ export default function OrderTrackingPage() {
   const isCancelled = order.status === "CANCELLED";
   const isCompleted = order.status === "COMPLETED";
   const isAwaitingConfirmation = order.status === "AWAITING_CONFIRMATION";
+  // A queue number exists once the order is confirmed — the receipt should be
+  // available from that point onward, not just once COMPLETED.
+  const isConfirmed = !isAwaitingConfirmation && !isCancelled;
   // The payment panel already covers "pay at counter" messaging while awaiting
   // confirmation — showing this banner too would duplicate it.
   const isCashPending = order.paymentMethod === "CASH" && order.paymentStatus === "PENDING" && !isAwaitingConfirmation;
@@ -201,35 +204,36 @@ export default function OrderTrackingPage() {
           </section>
         )}
 
-        {/* Receipt — completed orders only */}
-        {isCompleted && (
-          <section className="glass rounded-3xl p-6 space-y-4">
-            <div className="text-center space-y-1">
-              <h2 className="text-lg font-black">{order.store.name}</h2>
-              <p className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
-                Receipt · Queue #{order.queueNumber ?? "—"}
+        {/* Receipt — available once the order is confirmed (queue number issued) */}
+        {isConfirmed && (
+          <section className="rounded-3xl p-6 space-y-3 font-mono bg-[var(--color-bg-secondary)] border border-[var(--color-border)]">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-sm font-black uppercase tracking-wide">{order.store.name}</h2>
+              <p className="text-[11px] text-[var(--color-text-muted)]">
+                Receipt #{order.id.slice(-6).toUpperCase()} · Queue #{order.queueNumber ?? "—"}
               </p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">
+              <p className="text-[11px] text-[var(--color-text-muted)]">
                 {new Date(order.createdAt).toLocaleString("en-MY", {
                   dateStyle: "medium",
                   timeStyle: "short",
-                })}
+                })} · {order.paymentMethod === "CASH" ? "Cash" : "QR"}
               </p>
             </div>
 
-            <div className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
+            <div className="border-t border-dashed border-[var(--color-border)]" />
+
+            <div className="space-y-1">
               {order.orderItems.map((item) => (
-                <div key={item.id} className="py-2.5 flex justify-between gap-4 text-sm">
-                  <span className="flex gap-2">
-                    <span className="font-bold text-[var(--color-primary)]">{item.quantity}×</span>
-                    {item.itemName}
-                  </span>
-                  <span className="font-medium shrink-0">{formatPrice(item.lineTotal)}</span>
+                <div key={item.id} className="flex justify-between gap-4 text-xs">
+                  <span>{item.quantity}x&nbsp;&nbsp;{item.itemName}</span>
+                  <span className="shrink-0">{formatPrice(item.lineTotal)}</span>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-1.5">
+            <div className="border-t border-dashed border-[var(--color-border)]" />
+
+            <div className="space-y-1">
               <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
                 <span>Subtotal</span><span>{formatPrice(order.subtotal)}</span>
               </div>
@@ -238,14 +242,23 @@ export default function OrderTrackingPage() {
                   <span>{line.label} ({line.rate}%)</span><span>{formatPrice(line.amountCents / 100)}</span>
                 </div>
               ))}
-              <div className="flex justify-between text-base font-black pt-2 border-t border-[var(--color-border)]">
-                <span>Total</span>
-                <span className="text-[var(--color-primary)]">{formatPrice(order.total)}</span>
-              </div>
             </div>
 
+            <div className="border-t-4 border-double border-[var(--color-text)]" />
+
+            <div className="flex justify-between text-sm font-black">
+              <span>TOTAL</span>
+              <span>{formatPrice(order.total)}</span>
+            </div>
+
+            <div className="border-t border-dashed border-[var(--color-border)]" />
+
+            <p className="text-center text-[11px] text-[var(--color-text-muted)] pt-1">
+              Thank you! Come again :)
+            </p>
+
             <button onClick={() => window.print()}
-              className="w-full py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold flex items-center justify-center gap-2 print:hidden">
+              className="w-full py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold font-sans flex items-center justify-center gap-2 print:hidden">
               <Printer className="h-3.5 w-3.5" /> Print receipt
             </button>
           </section>
