@@ -1,0 +1,51 @@
+{
+  "port": 3100,
+  "merchantPayload": {
+    "bytes": 114903,
+    "orderCount": 100,
+    "bytesPerOrder": 1149,
+    "kbPerMinutePerDashboard": 2244.2
+  },
+  "customerPayload": {
+    "bytes": 294,
+    "frame": "{\"type\":\"ORDER_UPDATE\",\"id\":\"0207469f-d592-4504-a056-96ae5ba562d7\",\"queueNumber\":null,\"status\":\"AWAITING_CONFIRMATION\",\"paymentStatus\":\"PENDING\",\"estimatedWaitMins\":null,\"paidAt\":null,\"acceptedAt\":null,\"preparingAt\":null,\"readyAt\":null,\"completedAt\":null,\"createdAt\":\"2026-08-01T16:48:18.497Z\"}"
+  },
+  "queryCost": {
+    "getOrdersFullBoard": {
+      "count": 20,
+      "min": 10.083666999999991,
+      "p50": 10.481457999999975,
+      "p95": 12.31370800000002,
+      "p99": 13.665291999999965,
+      "max": 13.665291999999965
+    },
+    "storeStreamTimeToFirstFrame": {
+      "count": 20,
+      "min": 9.752624999999966,
+      "p50": 10.270541999999978,
+      "p95": 13.73762499999998,
+      "p99": 18.29424999999992,
+      "max": 18.29424999999992
+    }
+  },
+  "payloadGrowthCurve": [
+    {
+      "requestedActive": 10,
+      "actualActive": 10,
+      "bytes": 11234,
+      "bytesPerOrder": 1123.4
+    },
+    {
+      "requestedActive": 50,
+      "actualActive": 50,
+      "bytes": 57282,
+      "bytesPerOrder": 1145.6
+    },
+    {
+      "requestedActive": 100,
+      "actualActive": 100,
+      "bytes": 114903,
+      "bytesPerOrder": 1149
+    }
+  ]
+}
