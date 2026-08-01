@@ -18,6 +18,7 @@
     "@prisma/adapter-pg": "^6.19.3",
     "@prisma/client": "^6.19.3",
     "@prisma/config": "^7.7.0",
+    "@sentry/nextjs": "^10.69.0",
     "@supabase/supabase-js": "^2.103.0",
     "axios": "^1.15.0",
     "bcryptjs": "^3.0.3",
