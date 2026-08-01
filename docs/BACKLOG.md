@@ -27,12 +27,17 @@ Single source of truth for pending work. Items graduate to a spec in
   with no explicit pool; concurrent writes intermittently fail with prepared-statement
   errors against the Supabase pooler. Fix with an explicit `pg.Pool` (or pooler-safe
   config). Recommended before pilot traffic.
-- [ ] **SSE payload is 112 KB per poll with a full board** (measured 2026-08-01,
-  100 active orders; scripts/loadtest). Every merchant dashboard re-downloads the
-  entire order list every 3 s = ~2.24 MB/minute per open tab, growing linearly
-  with board size. Fix by sending deltas, trimming the payload to fields the
-  board actually renders, or lengthening the interval. Not urgent at pilot
-  volume; do it before a merchant routinely runs 100+ live orders.
+- [ ] **SSE payload is 112 KB per poll with a full board** (measured twice,
+  independently, 2026-08-01; scripts/loadtest). 100 active orders → 114,903 bytes
+  per poll (~1,149 bytes/order), re-sent every 3 s per open merchant dashboard =
+  ~2.2 MB/minute/tab. Growth is linear: 10/50/100 orders → 11 KB/57 KB/112 KB,
+  projecting ~345 KB per poll (6.75 MB/min) at 300 orders.
+  **The query is NOT the problem** — it runs in ~10 ms (p95 12 ms); this is
+  purely payload size. For contrast the customer stream sends 294 bytes, ~390x
+  smaller, because it carries 10 scalar fields and no orderItems. So the fix is
+  to trim the merchant payload to what the board actually renders and/or send
+  deltas — not to optimise the query. Not urgent at pilot volume; do it before a
+  merchant routinely runs 100+ live orders without clearing completed ones.
 - [ ] **Rate limit counts a whole shared network as one customer** — 10 orders/min
   keyed on IP. Customers on shop wifi or behind carrier NAT collide and get
   refused during a rush. Key on something better (session/device) or raise the
