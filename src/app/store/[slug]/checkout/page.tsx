@@ -15,7 +15,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   const store = await prisma.store.findUnique({
     where: { slug },
-    select: { operatingHours: true },
+    select: { operatingHours: true, charges: true },
   });
 
   if (!store) {
@@ -41,5 +41,5 @@ export default async function CheckoutPage({ params }: Props) {
     );
   }
 
-  return <CheckoutClient />;
+  return <CheckoutClient charges={store.charges} />;
 }

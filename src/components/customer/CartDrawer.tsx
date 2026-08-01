@@ -2,6 +2,7 @@
 
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
+import { computeCartCharges } from "@/lib/charges";
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
@@ -10,12 +11,17 @@ interface CartDrawerProps {
   onClose: () => void;
   storeSlug: string;
   canOrder?: boolean;
+  // Store's raw `charges` Json column — parsed by computeCartCharges via
+  // parseStoreCharges, same as the server does when the order is created.
+  charges?: unknown;
 }
 
-export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true }: CartDrawerProps) {
-  const { items, updateQuantity, updateInstructions, removeItem, getTotal, getTax, getFinalTotal } = useCart();
+export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true, charges }: CartDrawerProps) {
+  const { items, updateQuantity, updateInstructions, removeItem } = useCart();
 
   if (!isOpen) return null;
+
+  const { subtotalCents, lines, totalCents } = computeCartCharges(items, charges);
 
   return (
     <div className="fixed inset-0 z-[200] animate-fade-in">
@@ -104,15 +110,17 @@ export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true
             <div className="space-y-1.5 px-1">
               <div className="flex justify-between text-sm">
                 <span className="text-[var(--color-text-muted)]">Subtotal</span>
-                <span>{formatPrice(getTotal())}</span>
+                <span>{formatPrice(subtotalCents / 100)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--color-text-muted)]">SST (6%)</span>
-                <span>{formatPrice(getTax())}</span>
-              </div>
+              {lines.map((line) => (
+                <div key={line.label} className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-muted)]">{line.label} ({line.rate}%)</span>
+                  <span>{formatPrice(line.amountCents / 100)}</span>
+                </div>
+              ))}
               <div className="flex justify-between text-lg font-black border-t border-[var(--color-border)] pt-2 mt-2">
                 <span>Total</span>
-                <span className="text-[var(--color-primary)]">{formatPrice(getFinalTotal())}</span>
+                <span className="text-[var(--color-primary)]">{formatPrice(totalCents / 100)}</span>
               </div>
             </div>
 

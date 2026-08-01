@@ -27,6 +27,7 @@ interface Order {
   subtotal: number;
   tax: number;
   total: number;
+  chargeBreakdown: { label: string; rate: number; amountCents: number }[] | null;
   customerName: string;
   paymentMethod: string;
   paymentStatus: string;
@@ -232,9 +233,11 @@ export default function OrderTrackingPage() {
               <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
                 <span>Subtotal</span><span>{formatPrice(order.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                <span>SST (6%)</span><span>{formatPrice(order.tax)}</span>
-              </div>
+              {(order.chargeBreakdown ?? []).map((line) => (
+                <div key={line.label} className="flex justify-between text-xs text-[var(--color-text-muted)]">
+                  <span>{line.label} ({line.rate}%)</span><span>{formatPrice(line.amountCents / 100)}</span>
+                </div>
+              ))}
               <div className="flex justify-between text-base font-black pt-2 border-t border-[var(--color-border)]">
                 <span>Total</span>
                 <span className="text-[var(--color-primary)]">{formatPrice(order.total)}</span>

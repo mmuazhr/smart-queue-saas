@@ -3,14 +3,21 @@
 import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
+import { computeCartCharges } from "@/lib/charges";
 import { ArrowLeft, Phone, User, MessageSquare, BadgeCheck, Loader2, Banknote, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 
-export default function CheckoutClient() {
+interface CheckoutClientProps {
+  // Store's raw `charges` Json column — parsed by computeCartCharges via
+  // parseStoreCharges, same as the server does when the order is created.
+  charges?: unknown;
+}
+
+export default function CheckoutClient({ charges }: CheckoutClientProps) {
   const router = useRouter();
   const { slug } = useParams();
-  const { items, getTotal, getTax, getFinalTotal, storeId, clearCart } = useCart();
+  const { items, storeId, clearCart } = useCart();
 
   const [isHydrated, setIsHydrated] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -88,6 +95,8 @@ export default function CheckoutClient() {
   // Show nothing until hydrated (prevents flash-redirect)
   if (!isHydrated || items.length === 0) return null;
 
+  const { subtotalCents, lines, totalCents } = computeCartCharges(items, charges);
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
       <div className="sticky top-0 z-50 bg-[var(--color-bg)]/80 backdrop-blur-xl border-b border-[var(--color-border)] px-6 py-4 flex items-center gap-4">
@@ -122,14 +131,16 @@ export default function CheckoutClient() {
               ))}
               <div className="pt-4 space-y-1.5 px-1">
                 <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                  <span>Subtotal</span><span>{formatPrice(getTotal())}</span>
+                  <span>Subtotal</span><span>{formatPrice(subtotalCents / 100)}</span>
                 </div>
-                <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                  <span>SST (6%)</span><span>{formatPrice(getTax())}</span>
-                </div>
+                {lines.map((line) => (
+                  <div key={line.label} className="flex justify-between text-xs text-[var(--color-text-muted)]">
+                    <span>{line.label} ({line.rate}%)</span><span>{formatPrice(line.amountCents / 100)}</span>
+                  </div>
+                ))}
                 <div className="flex justify-between text-lg font-black pt-2 mt-2 border-t border-[var(--color-border)]">
                   <span>To Pay</span>
-                  <span className="text-[var(--color-primary)]">{formatPrice(getFinalTotal())}</span>
+                  <span className="text-[var(--color-primary)]">{formatPrice(totalCents / 100)}</span>
                 </div>
               </div>
             </div>
@@ -210,8 +221,8 @@ export default function CheckoutClient() {
             className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
               paymentMethod === "CASH"
-                ? <>Place Order — Pay {formatPrice(getFinalTotal())} at Counter</>
-                : <>Place Order — Pay {formatPrice(getFinalTotal())} via QR</>
+                ? <>Place Order — Pay {formatPrice(totalCents / 100)} at Counter</>
+                : <>Place Order — Pay {formatPrice(totalCents / 100)} via QR</>
             )}
           </button>
 

@@ -21,8 +21,6 @@ interface CartStore {
   removeItem: (itemId: string) => void;
   clearCart: () => void;
   getTotal: () => number;
-  getTax: () => number;
-  getFinalTotal: () => number;
   getItemCount: (itemId: string) => number;
   getTotalItemsCount: () => number;
 }
@@ -88,10 +86,6 @@ export const useCart = create<CartStore>()(
       getTotal: () => {
         return get().items.reduce((sum, i) => sum + i.price * i.quantity, 0);
       },
-
-      getTax: () => get().getTotal() * 0.06, // 6% SST
-
-      getFinalTotal: () => get().getTotal() + get().getTax(),
 
       getItemCount: (itemId) => {
         return get().items.find((i) => i.menuItemId === itemId)?.quantity || 0;

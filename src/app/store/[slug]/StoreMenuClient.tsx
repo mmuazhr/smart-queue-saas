@@ -192,10 +192,11 @@ export default function StoreMenuClient({ store, isOpen, closedLabel }: StoreMen
 
       {/* Cart Drawer */}
       <CartDrawer
-        isOpen={isCartOpen} 
-        onClose={() => setIsCartOpen(false)} 
-        storeSlug={store.slug} 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        storeSlug={store.slug}
         canOrder={isOpen}
+        charges={store.charges}
       />
     </div>
   );
