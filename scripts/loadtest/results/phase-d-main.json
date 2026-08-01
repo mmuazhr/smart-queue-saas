@@ -1,0 +1,58 @@
+{
+  "label": "main",
+  "port": 3100,
+  "pid": 23087,
+  "ulimitN": "1048576",
+  "holdMs": 15000,
+  "levels": [
+    {
+      "n": 300,
+      "wallSeconds": 15,
+      "opened": 300,
+      "clientFailed": 0,
+      "serverFailed": 0,
+      "droppedEarly": 0,
+      "errorMessages": {},
+      "serverProcess": {
+        "minRssMb": 313.9,
+        "maxRssMb": 334.1,
+        "avgCpuPct": 0.9,
+        "maxCpuPct": 4,
+        "count": 14
+      }
+    },
+    {
+      "n": 500,
+      "wallSeconds": 15,
+      "opened": 500,
+      "clientFailed": 0,
+      "serverFailed": 0,
+      "droppedEarly": 0,
+      "errorMessages": {},
+      "serverProcess": {
+        "minRssMb": 341.8,
+        "maxRssMb": 376,
+        "avgCpuPct": 2.2,
+        "maxCpuPct": 13.2,
+        "count": 14
+      }
+    },
+    {
+      "n": 1000,
+      "wallSeconds": 15,
+      "opened": 1000,
+      "clientFailed": 0,
+      "serverFailed": 0,
+      "droppedEarly": 0,
+      "errorMessages": {},
+      "serverProcess": {
+        "minRssMb": 422.7,
+        "maxRssMb": 436,
+        "avgCpuPct": 9.7,
+        "maxCpuPct": 41.8,
+        "count": 15
+      }
+    }
+  ],
+  "breakingPoint": null
+}

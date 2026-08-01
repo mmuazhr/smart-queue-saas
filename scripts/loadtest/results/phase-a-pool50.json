@@ -1,0 +1,178 @@
+{
+  "label": "pool50",
+  "port": 3100,
+  "pid": 21568,
+  "levels": [
+    {
+      "concurrency": 400,
+      "trialsPerLevel": 3,
+      "cleanTrials": 3,
+      "totalRequests": 1200,
+      "totalOk": 1200,
+      "totalApp": 0,
+      "totalClient": 0,
+      "errorRatePct": 0,
+      "trials": [
+        {
+          "trial": 1,
+          "wallSeconds": 0.508,
+          "peakInFlight": 400,
+          "byBucket": {
+            "ok": 400,
+            "app": 0,
+            "client": 0
+          },
+          "byStatus": {
+            "201": 400
+          },
+          "latencyMsOkOnly": {
+            "count": 400,
+            "min": 78.42033300000003,
+            "p50": 288.08795799999996,
+            "p95": 489.27937499999996,
+            "p99": 497.4183340000001,
+            "max": 499.0085
+          },
+          "throughputPerSec": 787.59
+        },
+        {
+          "trial": 2,
+          "wallSeconds": 0.343,
+          "peakInFlight": 400,
+          "byBucket": {
+            "ok": 400,
+            "app": 0,
+            "client": 0
+          },
+          "byStatus": {
+            "201": 400
+          },
+          "latencyMsOkOnly": {
+            "count": 400,
+            "min": 187.2565830000001,
+            "p50": 238.78983300000004,
+            "p95": 321.645,
+            "p99": 328.02549999999997,
+            "max": 328.79008299999987
+          },
+          "throughputPerSec": 1166.83
+        },
+        {
+          "trial": 3,
+          "wallSeconds": 0.313,
+          "peakInFlight": 400,
+          "byBucket": {
+            "ok": 400,
+            "app": 0,
+            "client": 0
+          },
+          "byStatus": {
+            "201": 400
+          },
+          "latencyMsOkOnly": {
+            "count": 400,
+            "min": 161.37987500000008,
+            "p50": 201.55433300000004,
+            "p95": 296.0870420000001,
+            "p99": 301.1379579999998,
+            "max": 301.5963750000001
+          },
+          "throughputPerSec": 1278.92
+        }
+      ],
+      "rss": {
+        "minMb": "248.5",
+        "maxMb": "479.6",
+        "endMb": "479.6",
+        "count": 8
+      }
+    },
+    {
+      "concurrency": 3000,
+      "trialsPerLevel": 3,
+      "cleanTrials": 0,
+      "totalRequests": 9000,
+      "totalOk": 7865,
+      "totalApp": 0,
+      "totalClient": 1135,
+      "errorRatePct": 12.61,
+      "trials": [
+        {
+          "trial": 1,
+          "wallSeconds": 8.455,
+          "peakInFlight": 3000,
+          "byBucket": {
+            "ok": 2607,
+            "app": 0,
+            "client": 393
+          },
+          "byStatus": {
+            "201": 2607,
+            "": 393
+          },
+          "latencyMsOkOnly": {
+            "count": 2607,
+            "min": 236.90737500000068,
+            "p50": 1123.3902499999995,
+            "p95": 6524.836791000001,
+            "p99": 6581.450958,
+            "max": 6591.4412919999995
+          },
+          "throughputPerSec": 308.34
+        },
+        {
+          "trial": 2,
+          "wallSeconds": 8.451,
+          "peakInFlight": 3000,
+          "byBucket": {
+            "ok": 2612,
+            "app": 0,
+            "client": 388
+          },
+          "byStatus": {
+            "201": 2612,
+            "": 388
+          },
+          "latencyMsOkOnly": {
+            "count": 2612,
+            "min": 208.16591599999992,
+            "p50": 1079.844916,
+            "p95": 6515.988542000001,
+            "p99": 6572.151791999999,
+            "max": 6576.585333000001
+          },
+          "throughputPerSec": 309.09
+        },
+        {
+          "trial": 3,
+          "wallSeconds": 8.429,
+          "peakInFlight": 3000,
+          "byBucket": {
+            "ok": 2646,
+            "app": 0,
+            "client": 354
+          },
+          "byStatus": {
+            "201": 2646,
+            "": 354
+          },
+          "latencyMsOkOnly": {
+            "count": 2646,
+            "min": 189.203290999998,
+            "p50": 1045.6841660000027,
+            "p95": 6494.522374999997,
+            "p99": 6556.138665999999,
+            "max": 6562.366958999999
+          },
+          "throughputPerSec": 313.91
+        }
+      ],
+      "rss": {
+        "minMb": "488.2",
+        "maxMb": "522.0",
+        "endMb": "490.9",
+        "count": 104
+      }
+    }
+  ]
+}
