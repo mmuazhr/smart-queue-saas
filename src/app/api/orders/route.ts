@@ -6,8 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createOrderSchema } from "@/lib/validators";
 import { auth } from "@/lib/auth";
-import { PaymentService, isPaymentProviderConfigured } from "@/lib/payments/service";
-import { assignQueueNumber } from "@/lib/queue";
+import { computeCharges, parseStoreCharges } from "@/lib/charges";
 import { isStoreOpen } from "@/lib/store-hours";
 import { toPlainOrder } from "@/lib/serializers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -81,13 +80,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { storeId, customerPhone, customerName, notes, items, paymentGateway } = parsed.data;
-    const gateway = paymentGateway ?? "STRIPE";
+    const { storeId, customerPhone, customerName, notes, items } = parsed.data;
 
     // Verify store exists, is active, and fetch operating hours
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { id: true, status: true, name: true, slug: true, operatingHours: true },
+      select: { id: true, status: true, name: true, slug: true, operatingHours: true, charges: true },
     });
 
     if (!store || store.status !== "ACTIVE") {
@@ -146,89 +144,37 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Tax: 6% SST, half-up rounding
-    const taxCents = Math.round(subtotalCents * 0.06);
-    const totalCents = subtotalCents + taxCents;
+    const { lines: chargeLines, chargeTotalCents } = computeCharges(
+      subtotalCents,
+      parseStoreCharges(store.charges)
+    );
+    const totalCents = subtotalCents + chargeTotalCents;
 
     const subtotal = new Prisma.Decimal((subtotalCents / 100).toFixed(2));
-    const tax = new Prisma.Decimal((taxCents / 100).toFixed(2));
+    const tax = new Prisma.Decimal((chargeTotalCents / 100).toFixed(2));
     const total = new Prisma.Decimal((totalCents / 100).toFixed(2));
 
-    if (gateway === "CASH") {
-      // Cash: assign queue number immediately and mark PAID
-      const queueNumber = await assignQueueNumber(storeId);
-
-      const order = await prisma.order.create({
-        data: {
-          storeId,
-          customerPhone,
-          customerName,
-          notes: notes || null,
-          subtotal,
-          tax,
-          total,
-          status: "PAID",
-          paymentStatus: "PENDING",
-          paymentGateway: "CASH",
-          queueNumber,
-          paidAt: new Date(),
-          orderItems: { create: orderItemsData },
-        },
-        include: { orderItems: true },
-      });
-
-      return NextResponse.json(
-        { success: true, data: { order: toPlainOrder(order), checkoutUrl: null } },
-        { status: 201 }
-      );
-    }
-
-    // Online payment flow (STRIPE / BILLPLZ)
-    if (!isPaymentProviderConfigured(gateway as "STRIPE" | "BILLPLZ")) {
-      return NextResponse.json(
-        {
-          success: false,
-          code: "PAYMENT_PROVIDER_UNAVAILABLE",
-          error: "Online payment is currently unavailable.",
-        },
-        { status: 503 }
-      );
-    }
-
-    const order = await prisma.$transaction(async (tx) => {
-      return tx.order.create({
-        data: {
-          storeId,
-          customerPhone,
-          customerName,
-          notes: notes || null,
-          subtotal,
-          tax,
-          total,
-          status: "PENDING_PAYMENT",
-          paymentStatus: "PENDING",
-          paymentGateway: gateway,
-          orderItems: { create: orderItemsData },
-        },
-        include: { orderItems: true },
-      });
+    // Queue number is assigned on merchant confirmation, never here.
+    const order = await prisma.order.create({
+      data: {
+        storeId,
+        customerPhone,
+        customerName,
+        notes,
+        subtotal,
+        tax,
+        total,
+        chargeBreakdown: chargeLines as unknown as Prisma.InputJsonValue,
+        status: "AWAITING_CONFIRMATION",
+        paymentMethod: parsed.data.paymentMethod,
+        paymentStatus: "PENDING",
+        orderItems: { create: orderItemsData },
+      },
+      select: { id: true, status: true },
     });
 
-    const payment = await PaymentService.initiatePayment(
-      gateway as "STRIPE" | "BILLPLZ",
-      {
-        orderId: order.id,
-        amount: totalCents / 100,
-        currency: "MYR",
-        customerName,
-        customerPhone,
-        successUrl: `${process.env.NEXTAUTH_URL}/store/${store.slug}/order/${order.id}?status=paid`,
-        cancelUrl: `${process.env.NEXTAUTH_URL}/store/${store.slug}/checkout?error=cancelled`,
-      }
-    );
-
     return NextResponse.json(
-      { success: true, data: { order: toPlainOrder(order), checkoutUrl: payment.redirectUrl } },
+      { success: true, data: { orderId: order.id, status: order.status } },
       { status: 201 }
     );
   } catch (error) {

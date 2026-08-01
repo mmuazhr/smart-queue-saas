@@ -97,7 +97,7 @@ export default function HomePage() {
               { 
                 icon: <ShieldCheck className="h-8 w-8 text-blue-400" />, 
                 title: "Secure Payments", 
-                desc: "Integrated with Stripe and Billplz for instant FPX bank transfers and cards." 
+                desc: "Customers pay via DuitNow QR and upload proof — no gateway fees, confirmed by the merchant."
               },
               { 
                 icon: <Clock className="h-8 w-8 text-green-400" />, 

@@ -38,7 +38,8 @@ export const optionalImageUrlSchema = z.preprocess(
 
 // ---- Store Schemas ----
 
-export { storeChargesSchema } from "./charges";
+import { storeChargesSchema } from "./charges";
+export { storeChargesSchema };
 
 export const createStoreSchema = z.object({
   name: z.string().min(2, "Store name must be at least 2 characters").max(100),
@@ -58,8 +59,10 @@ export const createStoreSchema = z.object({
       })
     )
     .optional(),
-  paymentGateway: z.enum(["STRIPE", "BILLPLZ", "TOYYIBPAY"]).optional(),
   gatewayMerchantId: z.string().optional(),
+  paymentInstructions: z.string().max(200).optional(),
+  paymentQrUrl: z.string().url().optional(),
+  charges: storeChargesSchema.optional(),
 });
 
 export const updateStoreSchema = createStoreSchema.partial();
@@ -105,7 +108,7 @@ export const createOrderSchema = z.object({
   items: z
     .array(createOrderItemSchema)
     .min(1, "Order must contain at least 1 item"),
-  paymentGateway: z.enum(["STRIPE", "BILLPLZ", "CASH"]).optional().default("STRIPE"),
+  paymentMethod: z.enum(["QR", "CASH"]).default("QR"),
 });
 
 // ---- Order Status Update ----
