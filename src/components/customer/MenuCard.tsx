@@ -13,7 +13,16 @@ interface MenuItem {
   imageUrl?: string | null;
 }
 
-export default function MenuCard({ item, canOrder = true }: { item: MenuItem; canOrder?: boolean }) {
+export default function MenuCard({
+  item,
+  canOrder = true,
+  unavailableLabel = "Closed",
+}: {
+  item: MenuItem;
+  canOrder?: boolean;
+  // "Closed" (hours) vs "Paused" (emergency toggle) — same disabled treatment, different reason.
+  unavailableLabel?: string;
+}) {
   const { addItem, updateQuantity, getItemCount } = useCart();
   const count = getItemCount(item.id);
 
@@ -85,7 +94,7 @@ export default function MenuCard({ item, canOrder = true }: { item: MenuItem; ca
               aria-disabled="true"
               className="w-full py-2.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] text-xs font-bold uppercase tracking-wider"
             >
-              Closed
+              {unavailableLabel}
             </button>
           ) : (
             <button 
