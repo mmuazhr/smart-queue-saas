@@ -9,13 +9,9 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime false cloudflare-env.d.ts"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
     "@prisma/adapter-pg": "^6.19.3",
     "@prisma/client": "^6.19.3",
     "@prisma/config": "^7.7.0",
@@ -58,7 +54,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.8",
-    "wrangler": "^4.116.0"
+    "vitest": "^4.1.8"
   }
 }
