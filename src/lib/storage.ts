@@ -29,3 +29,28 @@ export async function getPaymentProofBytes(key: string): Promise<{ bytes: Uint8A
   if (error || !data) return null;
   return { bytes: new Uint8Array(await data.arrayBuffer()), contentType: data.type || "image/jpeg" };
 }
+
+export interface ProofStorageEntry {
+  name: string;
+  /** null for folder entries returned by list() */
+  id: string | null;
+  /** null for folder entries returned by list() */
+  created_at: string | null;
+}
+
+/** Lists one level of the payment-proofs bucket. Pass "" for the bucket root. */
+export async function listPaymentProofEntries(prefix: string): Promise<ProofStorageEntry[]> {
+  const { data, error } = await client()
+    .storage.from(PROOF_BUCKET)
+    .list(prefix || undefined);
+  if (error) throw new Error(`List failed: ${error.message}`);
+  return data ?? [];
+}
+
+/** Deletes storage objects by key. Returns the number of objects removed. */
+export async function removePaymentProofs(keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0;
+  const { data, error } = await client().storage.from(PROOF_BUCKET).remove(keys);
+  if (error) throw new Error(`Remove failed: ${error.message}`);
+  return data?.length ?? keys.length;
+}
