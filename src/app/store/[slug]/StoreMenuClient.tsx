@@ -6,14 +6,16 @@ import MenuCard from "@/components/customer/MenuCard";
 import CartDrawer from "@/components/customer/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { ShoppingBag, ChevronRight, MapPin, Clock, Info } from "lucide-react";
-import { isStoreOpen } from "@/lib/store-hours";
+import ClosedBanner from "@/components/customer/ClosedBanner";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface StoreMenuClientProps {
   store: any; // Type according to Prisma include
+  isOpen: boolean;
+  closedLabel: string;
 }
 
-export default function StoreMenuClient({ store }: StoreMenuClientProps) {
+export default function StoreMenuClient({ store, isOpen, closedLabel }: StoreMenuClientProps) {
   const { setStoreId, items, getTotalItemsCount } = useCart();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -32,7 +34,6 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
   }, [store.id, store.categories, setStoreId]);
 
   const cartCount = getTotalItemsCount();
-  const isOpen = isStoreOpen(store.operatingHours);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-24">
@@ -72,6 +73,13 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
           <ThemeToggle className="bg-black/20 border-white/20 text-white hover:bg-black/40 hover:border-white/40" />
         </div>
       </div>
+
+      {/* Closed notice — menu stays browsable, ordering is disabled */}
+      {!isOpen && (
+        <div className="px-6 pt-4">
+          <ClosedBanner label={closedLabel} />
+        </div>
+      )}
 
       {/* Main Info */}
       <div className="px-6 py-4 flex flex-col gap-2">
@@ -137,7 +145,7 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {category.menuItems.map((item: any) => (
-                  <MenuCard key={item.id} item={item} />
+                  <MenuCard key={item.id} item={item} canOrder={isOpen} />
                 ))}
               </div>
             </section>
@@ -152,7 +160,7 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {store.menuItems.map((item: any) => (
-                <MenuCard key={item.id} item={item} />
+                <MenuCard key={item.id} item={item} canOrder={isOpen} />
               ))}
             </div>
           </section>
@@ -183,10 +191,11 @@ export default function StoreMenuClient({ store }: StoreMenuClientProps) {
       )}
 
       {/* Cart Drawer */}
-      <CartDrawer 
+      <CartDrawer
         isOpen={isCartOpen} 
         onClose={() => setIsCartOpen(false)} 
         storeSlug={store.slug} 
+        canOrder={isOpen}
       />
     </div>
   );

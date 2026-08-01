@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import StoreMenuClient from "./StoreMenuClient";
 import { Metadata } from "next";
+import { isStoreOpen, nextOpeningTime, type OperatingHoursEntry } from "@/lib/store-hours";
+import { openingLabel } from "@/components/customer/ClosedBanner";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -60,5 +62,9 @@ export default async function StorePage({ params }: Props) {
     );
   }
 
-  return <StoreMenuClient store={store} />;
+  const hours = store.operatingHours as Record<string, OperatingHoursEntry> | null;
+  const isOpen = isStoreOpen(hours);
+  const closedLabel = isOpen ? "" : openingLabel(nextOpeningTime(hours));
+
+  return <StoreMenuClient store={store} isOpen={isOpen} closedLabel={closedLabel} />;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isStoreOpen, type OperatingHoursEntry } from "./store-hours";
+import { isStoreOpen, nextOpeningTime, type OperatingHoursEntry } from "./store-hours";
 
 const TZ = "Asia/Kuala_Lumpur";
 
@@ -92,5 +92,84 @@ describe("overnight windows (close < open wraps past midnight)", () => {
 
   it("17:00-00:00 is closed at 12:00 MYT Friday (before opening)", () => {
     expect(isStoreOpen(overnight, new Date("2026-07-31T04:00:00Z"))).toBe(false);
+  });
+});
+
+describe("nextOpeningTime", () => {
+  // Offset a moment by whole days so the weekday key can be derived, never guessed.
+  const daysAfter = (d: Date, n: number): Date => new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
+
+  it("returns null for null operatingHours (always open)", () => {
+    expect(nextOpeningTime(null, new Date("2026-06-15T06:00:00Z"))).toBeNull();
+  });
+
+  it("returns null for undefined operatingHours (always open)", () => {
+    expect(nextOpeningTime(undefined, new Date("2026-06-15T06:00:00Z"))).toBeNull();
+  });
+
+  it("returns null when every day is marked isClosed", () => {
+    const now = new Date("2026-06-15T06:00:00Z");
+    const hours = Object.fromEntries(
+      Array.from({ length: 7 }, (_, i) => [dayKeyIn(daysAfter(now, i), TZ), entry("08:00", "22:00", true)])
+    );
+    expect(nextOpeningTime(hours, now)).toBeNull();
+  });
+
+  it("returns today when the store opens later today", () => {
+    const klEarly = new Date("2026-06-14T23:30:00Z"); // 07:30 KL
+    const hours = { [dayKeyIn(klEarly, TZ)]: entry("08:00", "22:00") };
+    expect(nextOpeningTime(hours, klEarly)).toEqual({ day: dayKeyIn(klEarly, TZ), time: "08:00" });
+  });
+
+  it("returns tomorrow once today's opening time has passed", () => {
+    const klLate = new Date("2026-06-15T15:00:00Z"); // 23:00 KL
+    const hours = {
+      [dayKeyIn(klLate, TZ)]: entry("08:00", "22:00"),
+      [dayKeyIn(daysAfter(klLate, 1), TZ)]: entry("09:00", "17:00"),
+    };
+    expect(nextOpeningTime(hours, klLate)).toEqual({
+      day: dayKeyIn(daysAfter(klLate, 1), TZ),
+      time: "09:00",
+    });
+  });
+
+  it("skips closed days to reach the next open one", () => {
+    const now = new Date("2026-06-15T06:00:00Z"); // 14:00 KL
+    const hours = {
+      [dayKeyIn(now, TZ)]: entry("08:00", "22:00", true),
+      [dayKeyIn(daysAfter(now, 1), TZ)]: entry("08:00", "22:00", true),
+      [dayKeyIn(daysAfter(now, 2), TZ)]: entry("10:30", "20:00"),
+    };
+    expect(nextOpeningTime(hours, now)).toEqual({
+      day: dayKeyIn(daysAfter(now, 2), TZ),
+      time: "10:30",
+    });
+  });
+
+  it("wraps around the week when only one distant day is open", () => {
+    // 2026-07-28 is a Tuesday in KL; the only open day is Monday.
+    const klTuesday = new Date("2026-07-28T06:00:00Z");
+    expect(dayKeyIn(klTuesday, TZ)).toBe("tuesday");
+    expect(nextOpeningTime({ monday: entry("08:00", "22:00") }, klTuesday)).toEqual({
+      day: "monday",
+      time: "08:00",
+    });
+  });
+
+  it("wraps a full week when the only open day is today but its opening time has passed", () => {
+    // 2026-07-27 is a Monday in KL; 22:00 KL is past the 08:00 opening.
+    const klMondayNight = new Date("2026-07-27T14:00:00Z");
+    expect(dayKeyIn(klMondayNight, TZ)).toBe("monday");
+    expect(nextOpeningTime({ monday: entry("08:00", "22:00") }, klMondayNight)).toEqual({
+      day: "monday",
+      time: "08:00",
+    });
+  });
+
+  it("honors an explicit timezone argument", () => {
+    const t = new Date("2026-06-15T06:00:00Z"); // 14:00 KL / 06:00 UTC
+    const utcHours = { [dayKeyIn(t, "UTC")]: entry("08:00", "22:00") };
+    // 06:00 UTC is still before the 08:00 opening, so it opens later the same day.
+    expect(nextOpeningTime(utcHours, t, "UTC")).toEqual({ day: dayKeyIn(t, "UTC"), time: "08:00" });
   });
 });

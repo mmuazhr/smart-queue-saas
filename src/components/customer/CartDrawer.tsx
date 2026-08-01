@@ -9,9 +9,10 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   storeSlug: string;
+  canOrder?: boolean;
 }
 
-export default function CartDrawer({ isOpen, onClose, storeSlug }: CartDrawerProps) {
+export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true }: CartDrawerProps) {
   const { items, updateQuantity, updateInstructions, removeItem, getTotal, getTax, getFinalTotal } = useCart();
 
   if (!isOpen) return null;
@@ -71,9 +72,11 @@ export default function CartDrawer({ isOpen, onClose, storeSlug }: CartDrawerPro
                       <Minus className="h-3.5 w-3.5" />
                     </button>
                     <span className="text-sm font-bold w-6 text-center">{item.quantity}</span>
-                    <button 
+                    <button
                       onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                      className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md"
+                      disabled={!canOrder}
+                      aria-disabled={!canOrder}
+                      className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md disabled:opacity-40 disabled:hover:bg-transparent"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
@@ -113,12 +116,23 @@ export default function CartDrawer({ isOpen, onClose, storeSlug }: CartDrawerPro
               </div>
             </div>
 
-            <Link 
-              href={`/store/${storeSlug}/checkout`}
-              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl gradient-primary text-white font-bold tracking-wider shadow-lg shadow-orange-500/20 hover:opacity-90 active:scale-[0.98] transition-all"
-            >
-              Checkout <ArrowRight className="h-4 w-4" />
-            </Link>
+            {canOrder ? (
+              <Link
+                href={`/store/${storeSlug}/checkout`}
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl gradient-primary text-white font-bold tracking-wider shadow-lg shadow-orange-500/20 hover:opacity-90 active:scale-[0.98] transition-all"
+              >
+                Checkout <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] font-bold tracking-wider"
+              >
+                Closed &mdash; Cannot Checkout
+              </button>
+            )}
           </div>
         )}
       </div>

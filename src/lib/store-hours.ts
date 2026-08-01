@@ -13,7 +13,7 @@ const DAYS_OF_WEEK = [
   "thursday", "friday", "saturday",
 ] as const;
 
-const DEFAULT_TIMEZONE = "Asia/Kuala_Lumpur";
+export const DEFAULT_TIMEZONE = "Asia/Kuala_Lumpur";
 
 /**
  * Determines whether a store is currently open.
@@ -72,4 +72,54 @@ export function isStoreOpen(
   }
 
   return false;
+}
+
+export interface NextOpening {
+  day: string;   // lowercase day name, matching the operatingHours keys
+  time: string;  // "HH:MM" 24h format
+}
+
+/**
+ * Finds the next moment the store opens, looking forward up to 7 days.
+ *
+ * Returns null when the store never opens (every day closed) or when
+ * operatingHours is null/undefined (always open, so there is nothing to wait for).
+ *
+ * @param operatingHours - Keyed by lowercase day name; null/undefined means always open
+ * @param now            - Current moment (defaults to Date.now())
+ * @param timeZone       - IANA timezone string (defaults to Asia/Kuala_Lumpur)
+ */
+export function nextOpeningTime(
+  operatingHours: Record<string, OperatingHoursEntry> | null | undefined,
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_TIMEZONE
+): NextOpening | null {
+  if (!operatingHours) return null;
+
+  const dayName = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone,
+  })
+    .format(now)
+    .toLowerCase() as (typeof DAYS_OF_WEEK)[number];
+
+  const currentTime = new Intl.DateTimeFormat("en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  }).format(now);
+
+  const dayIndex = DAYS_OF_WEEK.indexOf(dayName);
+
+  // Offset 0 only counts when the store has not opened yet today; offset 7 lets
+  // a store that opens on a single weekday wrap around to the same day next week.
+  for (let offset = 0; offset <= 7; offset++) {
+    const entry = operatingHours[DAYS_OF_WEEK[(dayIndex + offset) % 7]];
+    if (!entry || entry.isClosed) continue;
+    if (offset === 0 && currentTime >= entry.open) continue;
+    return { day: DAYS_OF_WEEK[(dayIndex + offset) % 7], time: entry.open };
+  }
+
+  return null;
 }

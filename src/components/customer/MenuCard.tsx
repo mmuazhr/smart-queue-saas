@@ -13,7 +13,7 @@ interface MenuItem {
   imageUrl?: string | null;
 }
 
-export default function MenuCard({ item }: { item: MenuItem }) {
+export default function MenuCard({ item, canOrder = true }: { item: MenuItem; canOrder?: boolean }) {
   const { addItem, updateQuantity, getItemCount } = useCart();
   const count = getItemCount(item.id);
 
@@ -61,7 +61,9 @@ export default function MenuCard({ item }: { item: MenuItem }) {
             <div className="flex items-center justify-between w-full bg-[var(--color-bg-tertiary)] rounded-xl px-1 py-1">
               <button 
                 onClick={() => updateQuantity(item.id, count - 1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors"
+                disabled={!canOrder}
+                aria-disabled={!canOrder}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
                 aria-label="Decrease quantity"
               >
                 <Minus className="h-4 w-4" />
@@ -69,12 +71,22 @@ export default function MenuCard({ item }: { item: MenuItem }) {
               <span className="font-bold text-sm w-8 text-center">{count}</span>
               <button 
                 onClick={() => updateQuantity(item.id, count + 1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors"
+                disabled={!canOrder}
+                aria-disabled={!canOrder}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
                 aria-label="Increase quantity"
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
+          ) : !canOrder ? (
+            <button
+              disabled
+              aria-disabled="true"
+              className="w-full py-2.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] text-xs font-bold uppercase tracking-wider"
+            >
+              Closed
+            </button>
           ) : (
             <button 
               onClick={() => addItem({
