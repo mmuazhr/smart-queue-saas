@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createCategorySchema } from "@/lib/validators";
+import { toTitleCase } from "@/lib/format";
 
 // GET /api/stores/[storeId]/categories — List categories for a store
 export async function GET(
@@ -52,6 +53,7 @@ export async function POST(
     const category = await prisma.category.create({
       data: {
         ...parsed.data,
+        name: toTitleCase(parsed.data.name),
         storeId,
       },
     });

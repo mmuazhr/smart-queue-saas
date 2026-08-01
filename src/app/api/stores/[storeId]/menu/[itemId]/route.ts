@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { updateMenuItemSchema } from "@/lib/validators";
+import { toTitleCase } from "@/lib/format";
 
 // PUT /api/stores/[storeId]/menu/[itemId]
 export async function PUT(
@@ -36,7 +37,10 @@ export async function PUT(
 
     const updated = await prisma.menuItem.update({
       where: { id: itemId, storeId }, // Ensure it belongs to the store
-      data: parsed.data,
+      data: {
+        ...parsed.data,
+        ...(parsed.data.name !== undefined && { name: toTitleCase(parsed.data.name) }),
+      },
     });
 
     return NextResponse.json({ success: true, data: updated });

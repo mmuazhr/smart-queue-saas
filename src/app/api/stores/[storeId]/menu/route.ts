@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createMenuItemSchema } from "@/lib/validators";
+import { toTitleCase } from "@/lib/format";
 
 // GET /api/stores/[storeId]/menu — List menu items grouped by category
 export async function GET(
@@ -79,6 +80,7 @@ export async function POST(
     const item = await prisma.menuItem.create({
       data: {
         ...parsed.data,
+        name: toTitleCase(parsed.data.name),
         storeId,
         categoryId: parsed.data.categoryId ?? null,
         imageUrl: parsed.data.imageUrl ?? null,
