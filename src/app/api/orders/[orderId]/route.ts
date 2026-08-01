@@ -115,14 +115,17 @@ async function confirmOrder(orderId: string, storeId: string, paymentMethod: str
   const queueNumber = await assignQueueNumber(storeId);
   const now = new Date();
 
+  // Hoisted so the degraded response below can echo exactly what was committed.
+  const confirmed = {
+    status: "PAID",
+    queueNumber,
+    confirmedAt: now,
+    ...(paymentMethod === "CASH" ? {} : { paymentStatus: "PAID", paidAt: now }),
+  };
+
   const { count } = await prisma.order.updateMany({
     where: { id: orderId, status: "AWAITING_CONFIRMATION" },
-    data: {
-      status: "PAID",
-      queueNumber,
-      confirmedAt: now,
-      ...(paymentMethod === "CASH" ? {} : { paymentStatus: "PAID", paidAt: now }),
-    },
+    data: confirmed,
   });
 
   if (count === 0) {
@@ -134,12 +137,25 @@ async function confirmOrder(orderId: string, storeId: string, paymentMethod: str
     );
   }
 
-  const updated = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { store: true },
-  });
+  // Past this point the confirmation is COMMITTED. The re-read only exists to
+  // build a richer response, so it must never turn a successful confirm into a
+  // failure: letting it reach the caller's catch would report 500 for an order
+  // that really is PAID, and the merchant's retry would then hit the 422 above
+  // on an order they were never told was confirmed.
+  try {
+    const updated = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: true },
+    });
+    if (updated) {
+      return NextResponse.json({ success: true, data: toPlainOrder(updated) });
+    }
+    logger.error("Confirm committed but order vanished on re-read:", orderId);
+  } catch (readError) {
+    logger.error("Confirm committed but re-read failed (non-fatal):", readError);
+  }
 
-  return NextResponse.json({ success: true, data: toPlainOrder(updated!) });
+  return NextResponse.json({ success: true, data: { id: orderId, ...confirmed } });
 }
 
 // PATCH /api/orders/[orderId] — Update order status (authenticated store owner)
