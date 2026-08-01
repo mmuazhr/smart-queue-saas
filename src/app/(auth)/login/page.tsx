@@ -12,7 +12,15 @@ import Link from "next/link";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  // Only accept internal same-origin paths. A raw callbackUrl fed to
+  // router.push() would execute a `javascript:` URL in-page and would follow
+  // an absolute/protocol-relative URL off-site (open redirect / phishing).
+  // A single leading slash — but not "//" (protocol-relative) — is safe.
+  const rawCallbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl =
+    rawCallbackUrl.startsWith("/") && !rawCallbackUrl.startsWith("//")
+      ? rawCallbackUrl
+      : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
