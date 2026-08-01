@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/register",
   "/api/auth",
+  "/api/health",    // unauthenticated healthcheck probe (Railway)
   "/api/webhooks",  // all provider webhooks (was /api/payments/webhook — wrong path)
   "/api/orders",    // anonymous customer checkout + order tracking
   "/api/queue/stream",
