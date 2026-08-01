@@ -315,3 +315,5 @@ git commit --allow-empty -m "chore: production origin cut over from Cloudflare W
 ## Rollback
 
 The Worker deployment is untouched until Task 5 Step 5. At any point before that, rollback = repoint DNS back to the Worker route. After Step 5, rollback = `git revert` the coupling-removal commit and `npm run deploy:cf` from the pre-migration commit (`git checkout <sha> -- wrangler.jsonc open-next.config.ts` restores config).
+
+**OBSOLETE as of Task 5 (2026-08-01):** the Worker is deleted and `deploy:cf` removed; this rollback path cannot execute. Actual rollback: redeploy the previous Railway deployment from the Railway dashboard.

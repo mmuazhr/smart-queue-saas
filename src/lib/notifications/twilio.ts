@@ -1,8 +1,9 @@
 // =============================================================================
 // Twilio Notification Provider
 // =============================================================================
-// Calls Twilio's REST API directly with fetch instead of the twilio SDK —
-// the SDK alone pushed the Cloudflare Worker bundle past the size limit.
+// Uses raw fetch instead of the Twilio SDK (originally to fit Cloudflare
+// Worker bundle limits — constraint gone since the 2026-08 Railway
+// migration, but the lean approach stays).
 
 import { NotificationProvider, SendNotificationParams } from "./types";
 

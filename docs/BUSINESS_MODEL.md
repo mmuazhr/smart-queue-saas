@@ -24,7 +24,7 @@ What is missing is not features. It is the operational and legal scaffolding tha
 |---|---|---|---|
 | 1 | **Payment settlement does not exist** | Customer payments land in **your** Stripe/Billplz account for food **the merchant** sells. You are intermediating funds with no payout mechanism. In Malaysia this is a regulated posture, not a backlog item. There is no settlement report, no payout job, no ledger. | The architecture already anticipates this: `Store.paymentGateway` and `Store.gatewayMerchantId` exist in the schema and are unused. Wire each merchant to their own Billplz collection so money never touches your account. This is the intended design — finish it. |
 | 2 | **6% SST hardcoded on every order** | `src/app/api/orders/route.ts:150` applies `subtotalCents * 0.06` unconditionally. Malaysian service tax registration is threshold-based; most small merchants are **not** registered. Charging tax on behalf of an unregistered business, and remitting it nowhere, is a live legal exposure for you and for them. | Make it a per-store field, **default off**. Small change, large risk reduction. |
-| 3 | **Rate limiting is a no-op in production** | `src/lib/rate-limit.ts` uses an in-memory `Map`. On Cloudflare Workers each isolate has its own memory and isolates are ephemeral and globally distributed, so the limiter resets constantly. Order creation and registration are effectively unlimited. Because each order can trigger SMS, this is a direct path to burning your Twilio balance, plus junk queue numbers on a live merchant's board. | Cloudflare WAF rate-limiting rules mitigate this **same day, with no code**. Do that before the pilot. Durable Objects or KV later. |
+| 3 | **Rate limiting is a no-op in production** | `src/lib/rate-limit.ts` uses an in-memory `Map`. On Cloudflare Workers each isolate has its own memory and isolates are ephemeral and globally distributed, so the limiter resets constantly. Order creation and registration are effectively unlimited. Because each order can trigger SMS, this is a direct path to burning your Twilio balance, plus junk queue numbers on a live merchant's board. | Cloudflare WAF rate-limiting rules mitigate this **same day, with no code**. Do that before the pilot. Durable Objects or KV later. **RESOLVED 2026-08-01:** migrated to Railway (single long-lived Node process) — the in-memory limiter now functions. WAF prescription obsolete. |
 | 4 | **No password reset flow** | There is no forgot-password route anywhere in `src/app`. A merchant who forgets their password is locked out and only you can rescue them with a manual DB write. At 5 merchants that is a phone call. At 50 it is your evenings. | Token-based email reset. Requires an email provider (none is integrated yet). |
 | 5 | **Zero observability** | No Sentry, no error tracking, no structured logging, no alerting. When a merchant says "orders stopped coming through," you have no way to find out what happened. | Sentry free tier plus Cloudflare Workers Logs. An afternoon. |
 
@@ -75,10 +75,9 @@ Workers Paid is non-negotiable regardless — the free plan's 10 ms CPU ceiling 
 
 | Item | USD | RM | Note |
 |---|---|---|---|
-| Cloudflare Workers Paid | $5 | 22 | Mandatory — free plan cannot serve SSR |
+| Railway Hobby | ~$5 base + usage | ~22 + usage | Realistically $5–15/mo all-in |
 | Supabase Pro | $25 | 111 | Mandatory — free tier pauses on inactivity, 500 MB cap, no PITR backups |
 | Domain | ~$1 | 5 | |
-| Hyperdrive | $0 | 0 | Included with Workers Paid |
 | R2 (menu images) | $0 | 0 | 10 GB free, zero egress fees |
 | Sentry / monitoring | $0 | 0 | Free tier sufficient at this scale |
 | **Total fixed** | **~$31** | **~RM 140** | Call it RM 150 with headroom |
@@ -267,7 +266,7 @@ Assumptions: 40% trial-to-paid conversion (warm, hand-sold — this will not sur
 
 **Before the pilot (this week)**
 1. Bound the SSE connection to 60–90 s — this is what buys "no 1102" (Part 2)
-2. Upgrade to Cloudflare Workers Paid + Supabase Pro
+2. Upgrade to Railway Hobby + Supabase Pro
 3. Add Cloudflare WAF rate-limiting rules — no code, closes Blocker #3
 4. Make SST per-store, default off — Blocker #2
 5. Add Sentry — Blocker #5
