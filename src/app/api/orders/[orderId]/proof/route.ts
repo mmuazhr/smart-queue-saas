@@ -44,6 +44,16 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "INVALID_STATUS" }, { status: 422 });
     }
 
+    // Cheap early reject before buffering the body: a public unauthenticated
+    // endpoint must not let a caller force the whole request into memory just
+    // to fail the size check afterward. Content-Length can be absent or
+    // spoofed, so this is a fast-path guard, not the authoritative check —
+    // the post-parse file.size comparison below still applies.
+    const contentLength = Number(request.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ success: false, error: "FILE_TOO_LARGE" }, { status: 400 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0 || file.size > MAX_UPLOAD_BYTES) {

@@ -15,8 +15,14 @@ export function toPlainOrderItem(item: AnyRecord): AnyRecord {
 }
 
 export function toPlainOrder(order: AnyRecord): AnyRecord {
+  // paymentProofUrl is a private-bucket storage key — internal reference only,
+  // never meant to leave the server. Strip it here so every caller (order
+  // detail, order list, admin dashboard, queue stream) is covered by one
+  // source of truth instead of each route remembering to redact it.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { paymentProofUrl: _paymentProofUrl, ...rest } = order;
   return {
-    ...order,
+    ...rest,
     subtotal: Number(order.subtotal),
     tax: Number(order.tax),
     total: Number(order.total),

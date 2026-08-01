@@ -68,11 +68,6 @@ export async function GET(
 
     const plain = toPlainOrder(order);
 
-    // The private-bucket storage key is an internal reference only — no caller
-    // (owner or not) needs it in a JSON response; merchants fetch proof bytes
-    // via GET /api/orders/[orderId]/proof instead.
-    delete plain.paymentProofUrl;
-
     if (!isOwner) {
       // Mask PII for unauthenticated / non-owner callers
       plain.customerPhone = maskPhone(order.customerPhone);
