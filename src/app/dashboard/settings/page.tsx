@@ -3,7 +3,31 @@
 import { useState, useEffect, useCallback } from "react";
 import QRCode from "qrcode";
 import { Save, Download, QrCode, Clock, Store as StoreIcon, MapPin, Phone, MessageSquare, CalendarClock, Copy, Check, ExternalLink, Rocket, Wallet, Upload, Plus, Trash2 } from "lucide-react";
-import { storeChargesSchema, parseStoreCharges, type StoreCharge } from "@/lib/charges";
+import { storeChargesSchema, parseStoreCharges } from "@/lib/charges";
+
+// Charges are edited as raw strings, not numbers — a controlled <input
+// type="number"> that coerces on every keystroke (parseFloat(...) || 0)
+// stomps on intermediate states like "6." (mid-typing a decimal) back to
+// "0", destroying whatever the merchant was typing. Coercion to a real
+// rate only happens at submit time, in parseChargeRate below.
+interface ChargeDraft {
+  label: string;
+  rate: string;
+  enabled: boolean;
+}
+
+function chargesFromStore(raw: unknown): ChargeDraft[] {
+  return parseStoreCharges(raw).map((charge) => ({ ...charge, rate: String(charge.rate) }));
+}
+
+// null means the string isn't a valid rate (blank, or not a finite number)
+// — the caller must block the save and show a message, never fall back to 0.
+function parseChargeRate(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
 
 interface OperatingHoursEntry {
   open: string;
@@ -74,7 +98,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [hoursMessage, setHoursMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [paymentInstructions, setPaymentInstructions] = useState("");
-  const [charges, setCharges] = useState<StoreCharge[]>([]);
+  const [charges, setCharges] = useState<ChargeDraft[]>([]);
   const [savingPayments, setSavingPayments] = useState(false);
   const [paymentsMessage, setPaymentsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [qrUploading, setQrUploading] = useState(false);
@@ -89,7 +113,7 @@ export default function SettingsPage() {
         setStore(currentStore);
         setHours(hoursFromStore(currentStore.operatingHours));
         setPaymentInstructions(currentStore.paymentInstructions ?? "");
-        setCharges(parseStoreCharges(currentStore.charges));
+        setCharges(chargesFromStore(currentStore.charges));
 
         // Generate QR code
         const origin = window.location.origin;
@@ -185,13 +209,13 @@ export default function SettingsPage() {
     setHours({ ...hours, [dayKey]: { ...hours[dayKey], ...patch } });
   }
 
-  function updateCharge(index: number, patch: Partial<StoreCharge>) {
+  function updateCharge(index: number, patch: Partial<ChargeDraft>) {
     setCharges(charges.map((charge, i) => (i === index ? { ...charge, ...patch } : charge)));
   }
 
   function addCharge() {
     if (charges.length >= 5) return;
-    setCharges([...charges, { label: "", rate: 0, enabled: true }]);
+    setCharges([...charges, { label: "", rate: "0", enabled: true }]);
   }
 
   function removeCharge(index: number) {
@@ -242,7 +266,21 @@ export default function SettingsPage() {
 
     setPaymentsMessage(null);
 
-    const parsedCharges = storeChargesSchema.safeParse(charges);
+    // Coerce each row's rate string to a number here, at submit time — never
+    // while the merchant is still typing (see ChargeDraft/parseChargeRate).
+    // A blank or unparseable rate blocks the save with a message instead of
+    // silently persisting 0.
+    const numericCharges: { label: string; rate: number; enabled: boolean }[] = [];
+    for (const charge of charges) {
+      const rate = parseChargeRate(charge.rate);
+      if (rate === null) {
+        setPaymentsMessage({ type: "error", text: "Enter a valid rate (0–100) for every charge." });
+        return;
+      }
+      numericCharges.push({ label: charge.label, rate, enabled: charge.enabled });
+    }
+
+    const parsedCharges = storeChargesSchema.safeParse(numericCharges);
     if (!parsedCharges.success) {
       setPaymentsMessage({ type: "error", text: parsedCharges.error.issues[0]?.message || "Invalid charge." });
       return;
@@ -263,7 +301,7 @@ export default function SettingsPage() {
       if (data.success) {
         setStore(data.data);
         setPaymentInstructions(data.data.paymentInstructions ?? "");
-        setCharges(parseStoreCharges(data.data.charges));
+        setCharges(chargesFromStore(data.data.charges));
         setPaymentsMessage({ type: "success", text: "Payment settings saved." });
       } else {
         setPaymentsMessage({ type: "error", text: data.error || "Failed to save payment settings." });
@@ -620,7 +658,7 @@ export default function SettingsPage() {
                           max="100"
                           step="0.1"
                           value={charge.rate}
-                          onChange={(e) => updateCharge(index, { rate: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateCharge(index, { rate: e.target.value })}
                           aria-label={`Charge ${index + 1} rate percent`}
                           className="w-full rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-sm bg-transparent"
                         />
