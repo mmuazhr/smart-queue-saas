@@ -97,3 +97,37 @@ from one phone on a shared network — worth remembering during onboarding.
   load is better measured after the pool fix).
 - Multi-store contention — prod has one store today.
 - Sustained multi-hour soak; the 60-second run is a smoke check for drift.
+
+---
+
+## Re-test after the pool fix (commit 5ef5a9f, deployed 2026-08-01)
+
+The fix turned out to address a bigger problem than diagnosed: production was
+running **three** independent connection pools, not one — the module was
+emitted into three separate Node-runtime bundles (instrumentation hook, Route
+Handlers, RSC/pages), each building its own unbounded pool (default max 10),
+so up to 30 sockets contended for a ceiling of 15. The fix caps one shared
+pool at 7 (two overlapping containers still fit under 15) and caches the
+client on `globalThis` in every environment so the three bundles share it.
+
+Same test, same post-deploy window:
+
+| Measure | Before | After |
+|---|---|---|
+| Storefront, 30 concurrent, immediately post-deploy | 60/180 HTTP 500 (**33%**) | **180/180 OK (0%)** |
+| p50 / p95 latency | 629 / 913 ms | 231 / 689 ms |
+| Concurrency ramp 30 / 40 / 60 | (0% only once settled) | 0% errors at every level; p50 260 → 401 ms |
+| 200 concurrent SSE streams | all opened, held | all opened, held, 0 dropped; health 126 ms under load |
+| `EMAXCONNSESSION` / `prisma:error` in logs | present | **none** |
+
+Latency improved as well as reliability, consistent with the old build
+thrashing three pools against a ceiling it kept breaching.
+
+**Residual risks accepted for the pilot:**
+- A saturated pool now waits up to 10 s for a free connection instead of
+  failing fast — queueing is the intended trade, but the worst case is a slow
+  error rather than a quick one.
+- `max: 7` assumes a single replica. Adding a second replica means revisiting
+  the arithmetic, or moving to the transaction-mode pooler (port 6543), which
+  lifts the 15-client ceiling entirely. That migration is the recommended
+  next step if traffic grows beyond the pilot.
