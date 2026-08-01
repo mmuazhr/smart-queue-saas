@@ -32,6 +32,9 @@ model Store {
   id                  String   @id @default(uuid())
   // One store per merchant (product decision 2026-07-31): the dashboard reads
   // stores[0] everywhere. Drop this constraint if multi-store ever ships.
+  // One store per merchant is a deliberate product decision, not an oversight.
+  // The dashboard assumes stores[0] throughout. Removing @unique is a product
+  // change plus a migration, not a quick fix.
   ownerId             String   @unique @map("owner_id")
   name                String
   slug                String   @unique
