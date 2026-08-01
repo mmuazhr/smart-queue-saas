@@ -6,12 +6,14 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { updateOrderStatusSchema } from "@/lib/validators";
+import { assignQueueNumber } from "@/lib/queue";
 import { NotificationService } from "@/lib/notifications/service";
 import { toPlainOrder } from "@/lib/serializers";
 import { logger } from "@/lib/logger";
 
 // Forward-only status transitions allowed
 const VALID_TRANSITIONS: Record<string, string[]> = {
+  AWAITING_CONFIRMATION: ["PAID", "CANCELLED"],
   PAID: ["ACCEPTED", "CANCELLED"],
   ACCEPTED: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY", "CANCELLED"],
@@ -43,7 +45,18 @@ export async function GET(
       where: { id: orderId },
       include: {
         store: {
-          select: { id: true, name: true, address: true, phone: true, slug: true },
+          // paymentQrUrl / paymentInstructions drive the customer payment panel.
+          // Both are merchant-published public values (paymentQrUrl comes from
+          // the public-assets bucket), so they are safe on an unauthenticated GET.
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            phone: true,
+            slug: true,
+            paymentQrUrl: true,
+            paymentInstructions: true,
+          },
         },
         orderItems: true,
       },
@@ -66,7 +79,10 @@ export async function GET(
             })
           )?.id);
 
+    // toPlainOrder strips paymentProofUrl (a private storage key), so the boolean
+    // has to be derived from the raw row. paymentMethod passes through untouched.
     const plain = toPlainOrder(order);
+    plain.hasProof = !!order.paymentProofUrl;
 
     if (!isOwner) {
       // Mask PII for unauthenticated / non-owner callers
@@ -79,6 +95,51 @@ export async function GET(
     logger.error("Fetch order error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
   }
+}
+
+/**
+ * Applies the AWAITING_CONFIRMATION → PAID transition: the merchant has seen the
+ * transfer (or accepted a cash order) and the customer finally joins the queue.
+ *
+ * assignQueueNumber owns its own transaction around the daily counter, so it
+ * cannot be nested inside one here. The number is therefore drawn first and the
+ * status change applied second, guarded on the row still being
+ * AWAITING_CONFIRMATION. Two merchants confirming at once means exactly one
+ * update lands; the loser burns a queue number, which is harmless — the counter
+ * only has to be monotonic, not gapless.
+ *
+ * Cash orders are NOT marked paid here: nothing has been handed over yet. They
+ * settle on collection (see settlesCash in PATCH).
+ */
+async function confirmOrder(orderId: string, storeId: string, paymentMethod: string) {
+  const queueNumber = await assignQueueNumber(storeId);
+  const now = new Date();
+
+  const { count } = await prisma.order.updateMany({
+    where: { id: orderId, status: "AWAITING_CONFIRMATION" },
+    data: {
+      status: "PAID",
+      queueNumber,
+      confirmedAt: now,
+      ...(paymentMethod === "CASH" ? {} : { paymentStatus: "PAID", paidAt: now }),
+    },
+  });
+
+  if (count === 0) {
+    // Lost the race — another confirmation moved the order out of
+    // AWAITING_CONFIRMATION between our read and this write.
+    return NextResponse.json(
+      { success: false, error: "Order is no longer awaiting confirmation" },
+      { status: 422 }
+    );
+  }
+
+  const updated = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { store: true },
+  });
+
+  return NextResponse.json({ success: true, data: toPlainOrder(updated!) });
 }
 
 // PATCH /api/orders/[orderId] — Update order status (authenticated store owner)
@@ -136,6 +197,13 @@ export async function PATCH(
       );
     }
 
+    // Merchant confirmation: this is the only point a queue number is handed out.
+    // `await` is load-bearing — a bare `return` of the promise would let a
+    // rejection escape this try/catch instead of being logged as a 500.
+    if (existing.status === "AWAITING_CONFIRMATION" && newStatus === "PAID") {
+      return await confirmOrder(orderId, existing.storeId, existing.paymentMethod);
+    }
+
     const timestampFields: Record<string, Date> = {};
     if (newStatus === "ACCEPTED") timestampFields.acceptedAt = new Date();
     if (newStatus === "PREPARING") timestampFields.preparingAt = new Date();
@@ -146,7 +214,7 @@ export async function PATCH(
     // otherwise the tracking page nags "please pay" forever.
     const settlesCash =
       newStatus === "COMPLETED" &&
-      existing.paymentGateway === "CASH" &&
+      existing.paymentMethod === "CASH" &&
       existing.paymentStatus === "PENDING";
 
     const updated = await prisma.order.update({

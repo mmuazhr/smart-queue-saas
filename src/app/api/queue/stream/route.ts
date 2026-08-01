@@ -59,7 +59,23 @@ export async function GET(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       };
 
+      // Declared before the first poll: the terminal-status branch below can fire
+      // on that very first run, and referencing `interval` there before the
+      // assignment threw a ReferenceError that the catch swallowed — leaving the
+      // stream open until the next tick. `closed` additionally stops a poll that
+      // is already in flight from enqueueing onto a closed controller.
+      let interval: ReturnType<typeof setInterval> | undefined;
+      let closed = false;
+
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        if (interval) clearInterval(interval);
+        controller.close();
+      };
+
       const poll = async () => {
+        if (closed) return;
         try {
           if (orderId) {
             // Single-order stream: project only safe fields — no phone/name
@@ -72,22 +88,31 @@ export async function GET(request: NextRequest) {
               sendEvent({ type: "ORDER_UPDATE", ...order });
 
               if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-                clearInterval(interval);
-                controller.close();
+                close();
               }
             }
           } else if (storeId) {
             const orders = await prisma.order.findMany({
               where: {
                 storeId,
-                status: { in: ["PAID", "ACCEPTED", "PREPARING", "READY"] },
+                status: {
+                  in: ["AWAITING_CONFIRMATION", "PAID", "ACCEPTED", "PREPARING", "READY"],
+                },
               },
               orderBy: { createdAt: "asc" },
               // Must match the /api/orders shape — the dashboard renders
               // order.orderItems and Decimal fields from this payload
               include: { orderItems: true },
             });
-            sendEvent({ type: "STORE_QUEUE_UPDATE", orders: orders.map(toPlainOrder) });
+            sendEvent({
+              type: "STORE_QUEUE_UPDATE",
+              // hasProof must be read off the raw row: toPlainOrder strips the
+              // storage key itself, and the merchant only needs the boolean.
+              orders: orders.map((order) => ({
+                ...toPlainOrder(order),
+                hasProof: !!order.paymentProofUrl,
+              })),
+            });
           }
         } catch (error) {
           logger.error("SSE Polling Error:", error);
@@ -95,12 +120,9 @@ export async function GET(request: NextRequest) {
       };
 
       await poll();
-      const interval = setInterval(poll, 3000);
+      if (!closed) interval = setInterval(poll, 3000);
 
-      request.signal.addEventListener("abort", () => {
-        clearInterval(interval);
-        controller.close();
-      });
+      request.signal.addEventListener("abort", close);
     },
   });
 

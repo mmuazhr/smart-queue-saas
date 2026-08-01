@@ -51,7 +51,12 @@ export async function GET(request: NextRequest) {
       take: 100,
     });
 
-    return NextResponse.json({ success: true, data: orders.map(toPlainOrder) });
+    // Same shape as the SSE STORE_QUEUE_UPDATE payload, so the board does not
+    // flip state when it swaps this initial load for the stream.
+    return NextResponse.json({
+      success: true,
+      data: orders.map((order) => ({ ...toPlainOrder(order), hasProof: !!order.paymentProofUrl })),
+    });
   } catch (error) {
     logger.error("Fetch orders error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });

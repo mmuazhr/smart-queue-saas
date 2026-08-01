@@ -27,7 +27,7 @@ interface Order {
   tax: number;
   total: number;
   customerName: string;
-  paymentGateway: string | null;
+  paymentMethod: string;
   paymentStatus: string;
   createdAt: string;
   orderItems: OrderItem[];
@@ -118,7 +118,7 @@ export default function OrderTrackingPage() {
   const currentStepIndex = steps.findIndex((s) => s.key === order.status);
   const isCancelled = order.status === "CANCELLED";
   const isCompleted = order.status === "COMPLETED";
-  const isCashPending = order.paymentGateway === "CASH" && order.paymentStatus === "PENDING";
+  const isCashPending = order.paymentMethod === "CASH" && order.paymentStatus === "PENDING";
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
