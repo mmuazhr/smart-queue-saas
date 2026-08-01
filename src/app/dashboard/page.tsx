@@ -31,12 +31,15 @@ interface Order {
   hasProof?: boolean;
 }
 
+// PAID and ACCEPTED are merged into one "Accepted" stage — confirming payment
+// IS accepting the order. `statuses` lists every order status that lands in
+// the column; ACCEPTED stays listed alongside PAID only so legacy in-flight
+// rows (confirmed before this merge shipped) still render and act correctly.
 const COLUMNS = [
-  { key: "AWAITING_CONFIRMATION", label: "Unconfirmed", color: "var(--color-warning)", nextAction: "Confirm", nextStatus: "PAID", rejectStatus: "CANCELLED" },
-  { key: "PAID", label: "New Orders", color: "var(--color-info)", nextAction: "Accept", nextStatus: "ACCEPTED", rejectStatus: "CANCELLED" },
-  { key: "ACCEPTED", label: "Accepted", color: "var(--color-warning)", nextAction: "Start Preparing", nextStatus: "PREPARING" },
-  { key: "PREPARING", label: "Preparing", color: "var(--color-primary)", nextAction: "Mark Ready", nextStatus: "READY" },
-  { key: "READY", label: "Ready", color: "var(--color-success)", nextAction: "Complete", nextStatus: "COMPLETED" },
+  { key: "AWAITING_CONFIRMATION", statuses: ["AWAITING_CONFIRMATION"], label: "Unconfirmed", color: "var(--color-warning)", nextAction: "Confirm", nextStatus: "PAID", rejectStatus: "CANCELLED" },
+  { key: "PAID", statuses: ["PAID", "ACCEPTED"], label: "Accepted", color: "var(--color-warning)", nextAction: "Start Preparing", nextStatus: "PREPARING", rejectStatus: "CANCELLED" },
+  { key: "PREPARING", statuses: ["PREPARING"], label: "Preparing", color: "var(--color-primary)", nextAction: "Mark Ready", nextStatus: "READY" },
+  { key: "READY", statuses: ["READY"], label: "Ready", color: "var(--color-success)", nextAction: "Complete", nextStatus: "COMPLETED" },
 ];
 
 const CHIME_REPEAT_MS = 20_000; // how often the alert replays while orders sit unconfirmed
@@ -203,9 +206,9 @@ export default function QueueDashboardPage() {
     }
   }
 
-  function rejectOrder(order: Order, expectedStatus: string) {
+  function rejectOrder(order: Order) {
     if (!window.confirm(`Cancel order #${order.queueNumber ?? "—"}? This can't be undone.`)) return;
-    updateOrderStatus(order.id, "CANCELLED", expectedStatus);
+    updateOrderStatus(order.id, "CANCELLED", order.status);
   }
 
   if (loading) {
@@ -278,7 +281,7 @@ export default function QueueDashboardPage() {
       {/* Kanban Columns */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {COLUMNS.map((col) => {
-          const colOrders = orders.filter((o) => o.status === col.key);
+          const colOrders = orders.filter((o) => col.statuses.includes(o.status));
           return (
             <div key={col.key} className="flex flex-col">
               {/* Column Header */}
@@ -410,7 +413,7 @@ export default function QueueDashboardPage() {
                       {/* Actions */}
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => updateOrderStatus(order.id, col.nextStatus, col.key)}
+                          onClick={() => updateOrderStatus(order.id, col.nextStatus, order.status)}
                           disabled={updatingOrderId !== null}
                           className="flex-1 rounded-lg py-2 text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                           style={{ background: col.color }}
@@ -419,7 +422,7 @@ export default function QueueDashboardPage() {
                         </button>
                         {col.rejectStatus && (
                           <button
-                            onClick={() => rejectOrder(order, col.key)}
+                            onClick={() => rejectOrder(order)}
                             disabled={updatingOrderId !== null}
                             className="rounded-lg border px-3 py-2 text-xs transition-colors hover:bg-[var(--color-error-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
                             style={{
