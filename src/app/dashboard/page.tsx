@@ -98,19 +98,28 @@ export default function QueueDashboardPage() {
   }, [streamData]);
 
   const unconfirmedCount = orders.filter((o) => o.status === "AWAITING_CONFIRMATION").length;
+  const hasUnconfirmed = unconfirmedCount > 0;
 
-  // Repeating alert: chime once when the unconfirmed count rises above its
-  // previous value, then replay every CHIME_REPEAT_MS while at least one
-  // order is still waiting. The cleanup always runs before the next effect
-  // invocation (dependency change, StrictMode double-invoke, or unmount), so
-  // there is never more than one interval alive at a time.
+  // Rise chime: fires immediately whenever the unconfirmed count increases
+  // (a new order arrived, or one dropped back in). Keyed on the raw count so
+  // every increase is caught, independent of the interval's own cadence.
   useEffect(() => {
     if (unconfirmedCount > prevUnconfirmedCount.current) {
       playNotificationSound();
     }
     prevUnconfirmedCount.current = unconfirmedCount;
+  }, [unconfirmedCount]);
 
-    if (unconfirmedCount > 0) {
+  // Repeating alert: replay every CHIME_REPEAT_MS while at least one order is
+  // waiting. Keyed on the boolean hasUnconfirmed (not the raw count) so a
+  // Confirm/Reject that leaves the column non-empty doesn't restart the
+  // cadence — the interval is created once when the column becomes
+  // non-empty and torn down once when it empties. The cleanup always runs
+  // before the next effect invocation (dependency change, StrictMode
+  // double-invoke, or unmount), so there is never more than one interval
+  // alive at a time.
+  useEffect(() => {
+    if (hasUnconfirmed) {
       chimeIntervalRef.current = setInterval(playNotificationSound, CHIME_REPEAT_MS);
     }
 
@@ -120,7 +129,7 @@ export default function QueueDashboardPage() {
         chimeIntervalRef.current = null;
       }
     };
-  }, [unconfirmedCount]);
+  }, [hasUnconfirmed]);
 
   function playNotificationSound() {
     try {
