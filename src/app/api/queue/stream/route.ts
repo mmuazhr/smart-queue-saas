@@ -7,8 +7,18 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { toPlainOrder } from "@/lib/serializers";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+// Customers legitimately reconnect on every navigation, so this is set to
+// absorb normal churn and only bite on a connection flood.
+const SSE_RATE_LIMIT = 15; // 15 stream connections per minute per IP
+
+// An abandoned tab otherwise polls Postgres every 3s forever. A live client is
+// unaffected: useOrderStream treats the close as an error and reconnects 5s
+// later, which costs one extra connection per 15 min against SSE_RATE_LIMIT.
+const MAX_STREAM_LIFETIME_MS = 15 * 60 * 1000;
 
 // Safe fields projected for the public single-order stream
 const ORDER_PUBLIC_FIELDS = {
@@ -26,6 +36,14 @@ const ORDER_PUBLIC_FIELDS = {
 } as const;
 
 export async function GET(request: NextRequest) {
+  // Gate connection establishment before any DB work or stream setup
+  if (!checkRateLimit(`sse:${getClientIp(request.headers)}`, SSE_RATE_LIMIT)) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get("orderId");
   const storeId = searchParams.get("storeId");
@@ -66,12 +84,14 @@ export async function GET(request: NextRequest) {
       // stream open until the next tick. `closed` additionally stops a poll that
       // is already in flight from enqueueing onto a closed controller.
       let interval: ReturnType<typeof setInterval> | undefined;
+      let lifetimeTimer: ReturnType<typeof setTimeout> | undefined;
       let closed = false;
 
       const close = () => {
         if (closed) return;
         closed = true;
         if (interval) clearInterval(interval);
+        if (lifetimeTimer) clearTimeout(lifetimeTimer);
         controller.close();
       };
 
@@ -121,7 +141,10 @@ export async function GET(request: NextRequest) {
       };
 
       await poll();
-      if (!closed) interval = setInterval(poll, 3000);
+      if (!closed) {
+        interval = setInterval(poll, 3000);
+        lifetimeTimer = setTimeout(close, MAX_STREAM_LIFETIME_MS);
+      }
 
       request.signal.addEventListener("abort", close);
     },
