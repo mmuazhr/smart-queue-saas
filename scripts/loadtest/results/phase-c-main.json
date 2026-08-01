@@ -1,0 +1,59 @@
+{
+  "label": "main",
+  "port": 3100,
+  "pid": 23087,
+  "holdMs": 30000,
+  "burstConcurrency": 200,
+  "wallSeconds": 30,
+  "orderBurst": {
+    "total": 200,
+    "byBucket": {
+      "ok": 200,
+      "app": 0,
+      "client": 0
+    },
+    "latencyMsOkOnly": {
+      "count": 200,
+      "min": 145.2571250000001,
+      "p50": 252.93533400000024,
+      "p95": 279.1323339999999,
+      "p99": 280.4754579999999,
+      "max": 344.49429199999986
+    }
+  },
+  "storefrontLoads": {
+    "total": 30,
+    "byBucket": {
+      "ok": 30,
+      "app": 0,
+      "client": 0
+    },
+    "latencyMsOkOnly": {
+      "count": 30,
+      "min": 329.77241700000013,
+      "p50": 344.683125,
+      "p95": 348.5992080000001,
+      "p99": 348.7452910000002,
+      "max": 348.7452910000002
+    }
+  },
+  "customerSse": {
+    "total": 200,
+    "opened": 200,
+    "failed": 0,
+    "droppedEarly": 0
+  },
+  "merchantSse": {
+    "total": 2,
+    "opened": 2,
+    "failed": 0,
+    "droppedEarly": 0
+  },
+  "serverProcess": {
+    "minRssMb": 246,
+    "maxRssMb": 385.3,
+    "avgCpuPct": 2.4,
+    "maxCpuPct": 37.8,
+    "count": 29
+  }
+}

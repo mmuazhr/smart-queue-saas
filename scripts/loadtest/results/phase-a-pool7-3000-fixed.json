@@ -1,0 +1,71 @@
+{
+  "label": "pool7-3000-fixed",
+  "port": 3100,
+  "pid": 18100,
+  "levels": [
+    {
+      "concurrency": 3000,
+      "trialsPerLevel": 2,
+      "cleanTrials": 0,
+      "totalRequests": 6000,
+      "totalOk": 5196,
+      "totalApp": 0,
+      "totalClient": 804,
+      "errorRatePct": 13.4,
+      "trials": [
+        {
+          "trial": 1,
+          "wallSeconds": 8.476,
+          "peakInFlight": 3000,
+          "byBucket": {
+            "ok": 2653,
+            "app": 0,
+            "client": 347
+          },
+          "byStatus": {
+            "201": 2653,
+            "": 347
+          },
+          "latencyMsOkOnly": {
+            "count": 2653,
+            "min": 91.87608300000011,
+            "p50": 1470.850667,
+            "p95": 6548.432583000001,
+            "p99": 6615.2465409999995,
+            "max": 6621.621708000001
+          },
+          "throughputPerSec": 312.99
+        },
+        {
+          "trial": 2,
+          "wallSeconds": 8.469,
+          "peakInFlight": 3000,
+          "byBucket": {
+            "ok": 2543,
+            "app": 0,
+            "client": 457
+          },
+          "byStatus": {
+            "201": 2543,
+            "": 457
+          },
+          "latencyMsOkOnly": {
+            "count": 2543,
+            "min": 280.8241659999985,
+            "p50": 1395.3424169999998,
+            "p95": 6538.675874999999,
+            "p99": 6588.207,
+            "max": 6594.375083000001
+          },
+          "throughputPerSec": 300.27
+        }
+      ],
+      "rss": {
+        "minMb": "444.7",
+        "maxMb": "613.9",
+        "endMb": "613.6",
+        "count": 69
+      }
+    }
+  ]
+}

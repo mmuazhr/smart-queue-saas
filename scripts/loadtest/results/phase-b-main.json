@@ -1,0 +1,36 @@
+{
+  "label": "main",
+  "port": 3100,
+  "pid": 23087,
+  "holdMs": 60000,
+  "wallSeconds": 60,
+  "customer": {
+    "total": 200,
+    "opened": 200,
+    "failed": 0,
+    "droppedEarly": 0,
+    "totalBytes": 1323800,
+    "totalEvents": 4000,
+    "failedSample": []
+  },
+  "merchant": {
+    "total": 2,
+    "opened": 2,
+    "failed": 0,
+    "droppedEarly": 0,
+    "totalBytes": 4596440,
+    "totalEvents": 40,
+    "failedSample": []
+  },
+  "merchantPayload": {
+    "bytes": 114903,
+    "orderCount": 100
+  },
+  "serverProcess": {
+    "minRssMb": 322.1,
+    "maxRssMb": 324.5,
+    "avgCpuPct": 0.5,
+    "maxCpuPct": 4.7,
+    "count": 59
+  }
+}
