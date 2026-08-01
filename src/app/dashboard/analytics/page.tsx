@@ -4,7 +4,7 @@
 // Analytics Dashboard — Professional Business Insights
 // =============================================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BarChart3, 
@@ -20,11 +20,30 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
+type RangeKey = "today" | "7d" | "30d";
+
+const RANGES: { key: RangeKey; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7 Days" },
+  { key: "30d", label: "30 Days" },
+];
+
+const rangeLabel = (key: RangeKey) => RANGES.find((r) => r.key === key)?.label ?? "Today";
+
+interface SeriesPoint {
+  hour?: number;
+  date?: string;
+  label: string;
+  count: number;
+  revenue: number;
+}
+
 interface AnalyticsData {
+  range: RangeKey;
   summary: {
-    todayRevenue: number;
+    revenue: number;
     revenueChange: number | null;
-    todayOrdersCount: number;
+    ordersCount: number;
     totalOrdersCount: number;
     averageOrderValue: number;
   };
@@ -33,23 +52,22 @@ interface AnalyticsData {
     quantity: number;
     revenue: number;
   }[];
-  hourlyDistribution: {
-    hour: number;
-    label: string;
-    count: number;
-    revenue: number;
-  }[];
+  series: {
+    granularity: "hourly" | "daily";
+    points: SeriesPoint[];
+  };
 }
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [range, setRange] = useState<RangeKey>("today");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const res = await fetch("/api/dashboard/analytics");
+      const res = await fetch(`/api/dashboard/analytics?range=${range}`);
       const json = await res.json();
       if (json.success) setData(json.data);
     } catch (err) {
@@ -58,11 +76,18 @@ export default function AnalyticsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [range]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  // Labels track the range the loaded data actually covers, so a slow refetch
+  // never pairs "30 Days" with today's numbers.
+  const shownRange = data?.range ?? range;
+  const shownLabel = rangeLabel(shownRange);
+  const series = data?.series;
+  const isDaily = series?.granularity === "daily";
 
   if (loading) {
     return (
@@ -85,34 +110,52 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-black tracking-tight">Analytics</h1>
           <p className="text-[var(--color-text-secondary)] text-sm">Real-time performance insights for your stall.</p>
         </div>
-        <button 
-          onClick={fetchData}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
-        >
-          <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Updating…" : "Refresh Data"}
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 p-1 rounded-xl glass" role="group" aria-label="Date range">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRange(r.key)}
+                aria-pressed={range === r.key}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  range === r.key
+                    ? "gradient-primary text-white"
+                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)]"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={fetchData}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl glass hover:bg-[var(--color-bg-tertiary)] transition-all text-xs font-bold"
+          >
+            <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Updating…" : "Refresh Data"}
+          </button>
+        </div>
       </div>
 
       {/* Top Level Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          label="Today's Revenue" 
-          value={formatPrice(data?.summary.todayRevenue || 0)} 
+        <StatCard
+          label={`Revenue (${shownLabel})`}
+          value={formatPrice(data?.summary.revenue || 0)}
           change={data?.summary.revenueChange ?? undefined}
           icon={<DollarSign className="h-5 w-5 text-green-500" />}
           delay={0}
         />
-        <StatCard 
-          label="Orders Today" 
-          value={data?.summary.todayOrdersCount.toString() || "0"} 
+        <StatCard
+          label={`Orders (${shownLabel})`}
+          value={data?.summary.ordersCount.toString() || "0"}
           icon={<ShoppingBag className="h-5 w-5 text-orange-500" />}
           delay={1}
         />
-        <StatCard 
-          label="Avg. Order Value" 
-          value={formatPrice(data?.summary.averageOrderValue || 0)} 
+        <StatCard
+          label={`Avg. Order Value (${shownLabel})`}
+          value={formatPrice(data?.summary.averageOrderValue || 0)}
           icon={<TrendingUp className="h-5 w-5 text-blue-500" />}
           delay={2}
         />
@@ -130,46 +173,60 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold flex items-center gap-2">
               <Clock className="h-4 w-4 text-[var(--color-primary)]" />
-              Order Volume (Today)
+              Order Volume ({shownLabel})
             </h3>
-            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-muted)]">By Hour</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-muted)]">
+              {isDaily ? "By Day" : "By Hour"}
+            </span>
           </div>
-          <div className="h-64 flex items-end gap-1 sm:gap-2 relative">
-            {data && data.hourlyDistribution.every((h) => h.count === 0) && (
+          <div className={`h-64 flex items-end relative ${isDaily ? "gap-0.5 sm:gap-1" : "gap-1 sm:gap-2"}`}>
+            {series && series.points.every((p) => p.count === 0) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40">
-                <p className="text-sm">No orders yet today.</p>
-                <p className="text-xs mt-1">Hourly volume appears here as orders come in.</p>
+                <p className="text-sm">No orders in this period.</p>
+                <p className="text-xs mt-1">
+                  {isDaily ? "Daily" : "Hourly"} volume appears here as orders come in.
+                </p>
               </div>
             )}
-            {data?.hourlyDistribution.map((h, i) => {
-              const maxCount = Math.max(...data.hourlyDistribution.map(d => d.count), 1);
-              const height = (h.count / maxCount) * 100;
+            {series?.points.map((p, i) => {
+              const maxCount = Math.max(...series.points.map((d) => d.count), 1);
+              const height = (p.count / maxCount) * 100;
               return (
-                <div key={h.hour} className="flex-1 flex flex-col items-center group">
-                  <motion.div 
+                <div key={p.date ?? p.hour} className="flex-1 flex flex-col items-center group">
+                  <motion.div
                     initial={{ height: 0 }}
                     animate={{ height: `${height}%` }}
                     transition={{ delay: i * 0.02, duration: 0.8, ease: "easeOut" }}
-                    className={`w-full rounded-t-sm sm:rounded-t-md transition-all ${h.count > 0 ? "gradient-primary" : "bg-[var(--color-bg-tertiary)] opacity-20"}`}
+                    className={`w-full rounded-t-sm sm:rounded-t-md transition-all ${p.count > 0 ? "gradient-primary" : "bg-[var(--color-bg-tertiary)] opacity-20"}`}
                   />
-                  <div className="mt-2 text-[8px] sm:text-[10px] text-[var(--color-text-muted)] hidden group-hover:block absolute -top-8 bg-zinc-900 text-white px-2 py-1 rounded">
-                    {h.count} orders
+                  <div className="mt-2 text-[8px] sm:text-[10px] text-[var(--color-text-muted)] hidden group-hover:block absolute -top-8 bg-zinc-900 text-white px-2 py-1 rounded whitespace-nowrap">
+                    {p.label} · {p.count} orders
                   </div>
                 </div>
               );
             })}
           </div>
           <div className="flex justify-between mt-4 px-1 text-[10px] font-bold text-[var(--color-text-muted)] italic">
-            <span>Morning</span>
-            <span>Afternoon</span>
-            <span>Evening</span>
+            {isDaily && series ? (
+              <>
+                <span>{series.points[0]?.label}</span>
+                <span>{series.points[Math.floor(series.points.length / 2)]?.label}</span>
+                <span>{series.points[series.points.length - 1]?.label}</span>
+              </>
+            ) : (
+              <>
+                <span>Morning</span>
+                <span>Afternoon</span>
+                <span>Evening</span>
+              </>
+            )}
           </div>
         </div>
 
         {/* Top Items */}
         <div className="glass rounded-3xl p-6 border border-[var(--color-border)]">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="font-bold">Popular Items</h3>
+            <h3 className="font-bold">Popular Items ({shownLabel})</h3>
             <BarChart3 className="h-4 w-4 text-[var(--color-text-muted)]" />
           </div>
           <div className="space-y-6">
@@ -214,7 +271,7 @@ export default function AnalyticsPage() {
   );
 }
 
-function StatCard({ label, value, change, icon, delay }: { label: string, value: string, change?: number, icon: any, delay: number }) {
+function StatCard({ label, value, change, icon, delay }: { label: string, value: string, change?: number, icon: ReactNode, delay: number }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
