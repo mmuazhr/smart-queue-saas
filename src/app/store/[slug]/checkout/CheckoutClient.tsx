@@ -3,11 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
-import { ArrowLeft, CreditCard, Phone, User, MessageSquare, ShieldCheck, BadgeCheck, Loader2, Banknote } from "lucide-react";
+import { ArrowLeft, Phone, User, MessageSquare, BadgeCheck, Loader2, Banknote, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-
-type PaymentGateway = "STRIPE" | "BILLPLZ" | "CASH";
 
 export default function CheckoutClient() {
   const router = useRouter();
@@ -18,7 +16,7 @@ export default function CheckoutClient() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentGateway, setPaymentGateway] = useState<PaymentGateway>("STRIPE");
+  const [paymentMethod, setPaymentMethod] = useState<"QR" | "CASH">("QR");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +54,7 @@ export default function CheckoutClient() {
         ? customerPhone
         : `+60${customerPhone.replace(/^0/, "")}`,
       notes,
-      paymentGateway,
+      paymentMethod,
       items: items.map((item) => ({
         menuItemId: item.menuItemId,
         quantity: item.quantity,
@@ -76,14 +74,7 @@ export default function CheckoutClient() {
       if (data.success) {
         orderPlacedRef.current = true;
         clearCart();
-        if (data.data.checkoutUrl) {
-          window.location.href = data.data.checkoutUrl;
-        } else {
-          // CASH order — go straight to tracking
-          router.push(`/store/${slug}/order/${data.data.order.id}`);
-        }
-      } else if (data.code === "PAYMENT_PROVIDER_UNAVAILABLE") {
-        setError("Online payment is currently unavailable. Please choose Pay at Counter (Cash).");
+        router.push(`/store/${slug}/order/${data.data.orderId}`);
       } else {
         setError(data.error || "Failed to place order. Please try again.");
       }
@@ -184,19 +175,18 @@ export default function CheckoutClient() {
           {/* Payment Method */}
           <section className="space-y-4">
             <h2 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-muted)] flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-[var(--color-primary)]" />
+              <QrCode className="h-4 w-4 text-[var(--color-primary)]" />
               Payment Method
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {(
                 [
-                  { key: "BILLPLZ", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-blue-600 font-bold">FPX</div>, title: "Bank Transfer (FPX)", sub: "Malaysian Online Banking" },
-                  { key: "STRIPE", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-indigo-600"><CreditCard className="h-6 w-6" /></div>, title: "Credit / Debit Card", sub: "Powered by Stripe" },
-                  { key: "CASH", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-green-600"><Banknote className="h-6 w-6" /></div>, title: "Pay at Counter (Cash)", sub: "Queue assigned instantly" },
+                  { key: "QR", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-indigo-600"><QrCode className="h-6 w-6" /></div>, title: "Scan & Pay (DuitNow QR)", sub: "Pay from any banking app, then upload your receipt" },
+                  { key: "CASH", icon: <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-lg text-green-600"><Banknote className="h-6 w-6" /></div>, title: "Pay at Counter", sub: "The shop confirms once you've paid" },
                 ] as const
               ).map(({ key, icon, title, sub }) => (
-                <button key={key} type="button" onClick={() => setPaymentGateway(key)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${paymentGateway === key ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)] glass opacity-60 hover:opacity-100"}`}>
+                <button key={key} type="button" onClick={() => setPaymentMethod(key)}
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${paymentMethod === key ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-1 ring-[var(--color-primary)]" : "border-[var(--color-border)] glass opacity-60 hover:opacity-100"}`}>
                   <div className="flex items-center gap-4">
                     {icon}
                     <div className="text-left">
@@ -204,7 +194,7 @@ export default function CheckoutClient() {
                       <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-tighter">{sub}</p>
                     </div>
                   </div>
-                  {paymentGateway === key && <BadgeCheck className="h-6 w-6 text-[var(--color-primary)]" />}
+                  {paymentMethod === key && <BadgeCheck className="h-6 w-6 text-[var(--color-primary)]" />}
                 </button>
               ))}
             </div>
@@ -219,15 +209,15 @@ export default function CheckoutClient() {
           <button type="submit" disabled={isSubmitting}
             className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-              paymentGateway === "CASH"
+              paymentMethod === "CASH"
                 ? <>Place Order — Pay {formatPrice(getFinalTotal())} at Counter</>
-                : <>Place Order &amp; Pay {formatPrice(getFinalTotal())}</>
+                : <>Place Order — Pay {formatPrice(getFinalTotal())} via QR</>
             )}
           </button>
 
           <p className="text-center text-[10px] text-[var(--color-text-muted)] px-8">
             By placing this order, you agree to our Terms of Service and Privacy Policy.
-            {paymentGateway !== "CASH" && " All payments are processed securely."}
+            {" "}Your queue number is issued once the shop confirms your payment.
           </p>
         </form>
       </div>
