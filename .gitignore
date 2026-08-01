@@ -50,7 +50,6 @@ next-env.d.ts
 .gstack/
 
 # cloudflare / opennext
-/.open-next/
 cloudflare-env.d.ts
 .dev.vars
 .dev.vars.*
