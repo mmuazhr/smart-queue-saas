@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { toPlainOrder } from "@/lib/serializers";
 
 // GET /api/stores/[storeId]/orders?active=true
 export async function GET(
@@ -38,5 +39,8 @@ export async function GET(
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json({ success: true, data: orders });
+  // toPlainOrder strips paymentProofUrl (a private payment-proof storage
+  // key) — every other order-returning endpoint routes through it; this one
+  // was missed.
+  return NextResponse.json({ success: true, data: orders.map(toPlainOrder) });
 }
