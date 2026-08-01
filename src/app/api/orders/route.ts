@@ -90,13 +90,22 @@ export async function POST(request: NextRequest) {
     // Verify store exists, is active, and fetch operating hours
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { id: true, status: true, name: true, slug: true, operatingHours: true, charges: true },
+      select: { id: true, status: true, name: true, slug: true, operatingHours: true, charges: true, ordersPaused: true },
     });
 
     if (!store || store.status !== "ACTIVE") {
       return NextResponse.json(
         { success: false, error: "Store is not available" },
         { status: 400 }
+      );
+    }
+
+    // Emergency pause: merchant has toggled off new orders (kitchen issue,
+    // etc). Existing orders keep flowing; only creation is gated here.
+    if (store.ordersPaused) {
+      return NextResponse.json(
+        { success: false, error: "The shop has temporarily paused new orders. Please try again soon." },
+        { status: 422 }
       );
     }
 

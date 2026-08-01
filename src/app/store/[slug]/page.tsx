@@ -80,5 +80,12 @@ export default async function StorePage({ params }: Props) {
     menuItems: store.menuItems.map(toPlainMenuItem),
   };
 
-  return <StoreMenuClient store={plainStore} isOpen={isOpen} closedLabel={closedLabel} />;
+  return (
+    <StoreMenuClient
+      store={plainStore}
+      isOpen={isOpen}
+      closedLabel={closedLabel}
+      ordersPaused={store.ordersPaused}
+    />
+  );
 }

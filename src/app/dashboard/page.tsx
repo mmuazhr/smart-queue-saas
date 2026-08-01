@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { OrderAgeBadge } from "@/components/dashboard/OrderAgeBadge";
+import { AlertTriangle } from "lucide-react";
 
 interface OrderItem {
   id: string;
@@ -48,6 +49,8 @@ export default function QueueDashboardPage() {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [ordersPaused, setOrdersPaused] = useState(false);
+  const [pauseToggling, setPauseToggling] = useState(false);
   const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
   const prevUnconfirmedCount = useRef(0);
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -62,11 +65,38 @@ export default function QueueDashboardPage() {
       const data = await res.json();
       if (data.success && data.data.length > 0) {
         setStoreId(data.data[0].id);
+        setOrdersPaused(!!data.data[0].ordersPaused);
       }
       setLoading(false);
     }
     fetchStore();
   }, []);
+
+  // Optimistic — this is the emergency-use toggle, no confirm dialog. Revert
+  // on a failed PUT so the switch never lies about the server's actual state.
+  async function toggleOrdersPaused() {
+    if (!storeId || pauseToggling) return;
+    const next = !ordersPaused;
+    setOrdersPaused(next);
+    setPauseToggling(true);
+    try {
+      const res = await fetch(`/api/stores/${storeId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ordersPaused: next }),
+      });
+      if (!res.ok) {
+        setOrdersPaused(!next);
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "Could not update queue status — please try again.");
+      }
+    } catch {
+      setOrdersPaused(!next);
+      setActionError("Network problem — queue status was not updated. Check your connection and retry.");
+    } finally {
+      setPauseToggling(false);
+    }
+  }
 
   // Fetch initial orders
   const fetchOrders = useCallback(async () => {
@@ -204,14 +234,37 @@ export default function QueueDashboardPage() {
             {orders.length} active order{orders.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={fetchOrders}
-          className="rounded-lg border px-4 py-2 text-sm transition-colors hover:bg-[var(--color-bg-tertiary)]"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleOrdersPaused}
+            disabled={pauseToggling}
+            role="switch"
+            aria-checked={!ordersPaused}
+            aria-label="Toggle accepting new orders"
+            className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+              ordersPaused
+                ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
+                : "bg-green-500/10 border-green-500/30 text-green-600 hover:bg-green-500/20"
+            }`}
+          >
+            {ordersPaused ? "Queue paused" : "Accepting orders"}
+          </button>
+          <button
+            onClick={fetchOrders}
+            className="rounded-lg border px-4 py-2 text-sm transition-colors hover:bg-[var(--color-bg-tertiary)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {ordersPaused && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Queue is paused — customers cannot place new orders.</span>
+        </div>
+      )}
 
       {actionError && (
         <div className="flex items-center justify-between rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-500">

@@ -11,12 +11,22 @@ interface CartDrawerProps {
   onClose: () => void;
   storeSlug: string;
   canOrder?: boolean;
+  // "Closed — Cannot Checkout" (hours) vs a pause-specific label — same
+  // disabled treatment, different reason.
+  unavailableLabel?: string;
   // Store's raw `charges` Json column — parsed by computeCartCharges via
   // parseStoreCharges, same as the server does when the order is created.
   charges?: unknown;
 }
 
-export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true, charges }: CartDrawerProps) {
+export default function CartDrawer({
+  isOpen,
+  onClose,
+  storeSlug,
+  canOrder = true,
+  unavailableLabel = "Closed — Cannot Checkout",
+  charges,
+}: CartDrawerProps) {
   const { items, updateQuantity, updateInstructions, removeItem } = useCart();
 
   if (!isOpen) return null;
@@ -138,7 +148,7 @@ export default function CartDrawer({ isOpen, onClose, storeSlug, canOrder = true
                 aria-disabled="true"
                 className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] font-bold tracking-wider"
               >
-                Closed &mdash; Cannot Checkout
+                {unavailableLabel}
               </button>
             )}
           </div>

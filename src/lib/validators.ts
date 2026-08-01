@@ -65,7 +65,10 @@ export const createStoreSchema = z.object({
   charges: storeChargesSchema.optional(),
 });
 
-export const updateStoreSchema = createStoreSchema.partial();
+// Emergency queue pause (dashboard toggle only — not part of store creation).
+export const updateStoreSchema = createStoreSchema.partial().extend({
+  ordersPaused: z.boolean().optional(),
+});
 
 // ---- Category Schemas ----
 

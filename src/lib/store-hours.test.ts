@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isStoreOpen, nextOpeningTime, type OperatingHoursEntry } from "./store-hours";
+import { isStoreOpen, nextOpeningTime, canPlaceOrder, type OperatingHoursEntry } from "./store-hours";
 
 const TZ = "Asia/Kuala_Lumpur";
 
@@ -171,5 +171,23 @@ describe("nextOpeningTime", () => {
     const utcHours = { [dayKeyIn(t, "UTC")]: entry("08:00", "22:00") };
     // 06:00 UTC is still before the 08:00 opening, so it opens later the same day.
     expect(nextOpeningTime(utcHours, t, "UTC")).toEqual({ day: dayKeyIn(t, "UTC"), time: "08:00" });
+  });
+});
+
+describe("canPlaceOrder", () => {
+  it("allows ordering when open and not paused", () => {
+    expect(canPlaceOrder(true, false)).toBe(true);
+  });
+
+  it("blocks ordering when open but paused", () => {
+    expect(canPlaceOrder(true, true)).toBe(false);
+  });
+
+  it("blocks ordering when closed and not paused", () => {
+    expect(canPlaceOrder(false, false)).toBe(false);
+  });
+
+  it("blocks ordering when closed and paused", () => {
+    expect(canPlaceOrder(false, true)).toBe(false);
   });
 });

@@ -74,6 +74,16 @@ export function isStoreOpen(
   return false;
 }
 
+/**
+ * Whether a customer can currently place an order: the store must be within
+ * operating hours AND not under an emergency pause. Both gates are checked
+ * independently server-side (POST /api/orders); this is the shared source
+ * of truth for the storefront/checkout UI so they can't drift from it.
+ */
+export function canPlaceOrder(isOpen: boolean, ordersPaused: boolean): boolean {
+  return isOpen && !ordersPaused;
+}
+
 export interface NextOpening {
   day: string;   // lowercase day name, matching the operatingHours keys
   time: string;  // "HH:MM" 24h format

@@ -1,4 +1,4 @@
-import { Moon } from "lucide-react";
+import { Moon, PauseCircle } from "lucide-react";
 import { DEFAULT_TIMEZONE, type NextOpening } from "@/lib/store-hours";
 
 const DAY_LABELS: Record<string, string> = {
@@ -60,6 +60,24 @@ export default function ClosedBanner({ label }: { label: string }) {
         <p className="font-black text-[var(--color-text)] leading-tight">Closed</p>
         <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
           {label} &mdash; browse the menu now, order when we reopen.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Emergency pause banner — same shell/styling as ClosedBanner, distinct copy
+// so customers don't mistake a kitchen pause for the store being closed.
+export function PausedBanner() {
+  return (
+    <div className="glass rounded-2xl px-5 py-4 flex items-center gap-4 border border-[var(--color-border)]">
+      <div className="h-11 w-11 shrink-0 rounded-xl bg-[var(--color-bg-tertiary)] flex items-center justify-center text-[var(--color-text-secondary)]">
+        <PauseCircle className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="font-black text-[var(--color-text)] leading-tight">Temporarily not accepting orders</p>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+          The shop has paused new orders for a moment. Please check back soon.
         </p>
       </div>
     </div>
