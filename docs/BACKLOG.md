@@ -27,6 +27,19 @@ Single source of truth for pending work. Items graduate to a spec in
   with no explicit pool; concurrent writes intermittently fail with prepared-statement
   errors against the Supabase pooler. Fix with an explicit `pg.Pool` (or pooler-safe
   config). Recommended before pilot traffic.
+- [ ] **SSE payload is 112 KB per poll with a full board** (measured 2026-08-01,
+  100 active orders; scripts/loadtest). Every merchant dashboard re-downloads the
+  entire order list every 3 s = ~2.24 MB/minute per open tab, growing linearly
+  with board size. Fix by sending deltas, trimming the payload to fields the
+  board actually renders, or lengthening the interval. Not urgent at pilot
+  volume; do it before a merchant routinely runs 100+ live orders.
+- [ ] **Rate limit counts a whole shared network as one customer** — 10 orders/min
+  keyed on IP. Customers on shop wifi or behind carrier NAT collide and get
+  refused during a rush. Key on something better (session/device) or raise the
+  cap substantially. Higher priority than it looks: fails during exactly the
+  busy period the product is for.
+- [ ] **Checked-in `.env` points at a dead database** (port 51230, orphaned
+  `prisma dev` daemon from a deleted checkout). Fresh clones lose time on it.
 - [ ] **External uptime monitor** on `/api/health` — Railway restart policy is
   ON_FAILURE max 5 retries, after which the service can go dark silently.
 - [ ] **Pilot merchant onboarding** — prod has no store yet; create/onboard the pilot
