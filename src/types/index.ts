@@ -34,12 +34,6 @@ export enum PaymentStatus {
   REFUNDED = "REFUNDED",
 }
 
-export enum PaymentGateway {
-  STRIPE = "STRIPE",
-  BILLPLZ = "BILLPLZ",
-  TOYYIBPAY = "TOYYIBPAY",
-}
-
 export enum NotificationChannel {
   WHATSAPP = "WHATSAPP",
   SMS = "SMS",
@@ -85,7 +79,7 @@ export interface Store {
   maxConcurrentOrders: number;
   operatingHours: OperatingHours | null;
   qrCodeUrl: string | null;
-  paymentGateway: PaymentGateway | null;
+  paymentGateway: string | null;
   gatewayMerchantId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -126,7 +120,7 @@ export interface Order {
   total: number;
   estimatedWaitMins: number | null;
   paymentIntentId: string | null;
-  paymentGateway: PaymentGateway | null;
+  paymentGateway: string | null;
   paymentStatus: PaymentStatus;
   notes: string | null;
   paidAt: Date | null;

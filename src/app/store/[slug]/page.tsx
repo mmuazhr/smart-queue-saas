@@ -4,6 +4,7 @@ import StoreMenuClient from "./StoreMenuClient";
 import { Metadata } from "next";
 import { isStoreOpen, nextOpeningTime, type OperatingHoursEntry } from "@/lib/store-hours";
 import { openingLabel } from "@/components/customer/ClosedBanner";
+import { toPlainMenuItem } from "@/lib/serializers";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -66,5 +67,18 @@ export default async function StorePage({ params }: Props) {
   const isOpen = isStoreOpen(hours);
   const closedLabel = isOpen ? "" : openingLabel(nextOpeningTime(hours));
 
-  return <StoreMenuClient store={store} isOpen={isOpen} closedLabel={closedLabel} />;
+  // menuItems.price is a Prisma Decimal, which isn't a plain serializable
+  // value — passing it straight into a Client Component prop triggers a
+  // server/client boundary warning. Convert every menu item the same way
+  // toPlainOrder/toPlainOrderItem already do for orders.
+  const plainStore = {
+    ...store,
+    categories: store.categories.map((category) => ({
+      ...category,
+      menuItems: category.menuItems.map(toPlainMenuItem),
+    })),
+    menuItems: store.menuItems.map(toPlainMenuItem),
+  };
+
+  return <StoreMenuClient store={plainStore} isOpen={isOpen} closedLabel={closedLabel} />;
 }

@@ -17,6 +17,15 @@ The database has been seeded with a production-ready environment. You can immedi
 - **Merchant Demo**: `merchant@test.my` / `merchant123`
 - **Live Storefront URL**: `http://localhost:3000/store/abang-burger`
 
+## 💳 Payment Flow
+
+There is no payment gateway integration — QueLess never touches customer money. Each merchant connects their own bank account via a DuitNow QR code:
+
+1. **Merchant setup** (Settings → Payments & Charges): upload a DuitNow QR code, add optional payment instructions (e.g. "Transfer to Maybank ..."), and configure up to 5 charges (e.g. SST 6%, Service 10%) — each applied flat on the order subtotal, never compounded.
+2. **Customer pays**: at checkout the customer picks Scan & Pay (QR) or Pay at Counter (cash) — both follow the same confirm flow. For QR, the customer scans the merchant's code in their own banking app, then uploads a screenshot of the payment as proof.
+3. **Merchant confirms**: the order sits in an "Unconfirmed" column on the dashboard with the uploaded receipt visible. The customer's queue number is issued only once the merchant confirms the payment — never before. Cash orders go through the same confirm gate.
+4. **Order lifecycle**: confirmed → accepted → preparing → ready → completed, same as before.
+
 ## 🏁 Launch Checklist (The Last 3 Steps)
 
 To move from your computer to a live public website, do the following:
@@ -34,7 +43,7 @@ Add your `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` to 
 4. Deploy!
 
 ## 🛠️ Maintenance & Scaling
-- **Adding Features**: The project is modular. You can add new payment providers in `src/lib/payments/` or new notification types in `src/lib/notifications/`.
+- **Adding Features**: The project is modular. Payment charge logic lives in `src/lib/charges.ts`; new notification types go in `src/lib/notifications/`.
 - **Database Schema**: To change your data structure, edit `prisma/schema.prisma` and run `npx prisma db push`.
 - **Scaling**: Supabase and Vercel will automatically scale as you add more merchants and customers.
 
