@@ -37,7 +37,7 @@ export async function PATCH(
 
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { ownerId: true, queueDelayMins: true },
+      select: { ownerId: true },
     });
     if (!store) {
       return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
@@ -46,9 +46,16 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    const deltaMins = delayMins - store.queueDelayMins;
-
     await prisma.$transaction(async (tx) => {
+      // Re-read the baseline inside the transaction, not before it — a
+      // double-submit racing this request would otherwise compute its delta
+      // from the same stale queueDelayMins both times.
+      const current = await tx.store.findUniqueOrThrow({
+        where: { id: storeId },
+        select: { queueDelayMins: true },
+      });
+      const deltaMins = delayMins - current.queueDelayMins;
+
       await tx.store.update({
         where: { id: storeId },
         data: {

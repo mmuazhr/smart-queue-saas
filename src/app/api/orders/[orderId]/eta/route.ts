@@ -58,16 +58,45 @@ export async function PATCH(
 
     // Push from the current promise, or from now if none was ever stamped.
     const base = existing.estimatedReadyAt ?? new Date();
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        etaAdjustMins: { increment: addMins },
-        estimatedReadyAt: new Date(base.getTime() + addMins * 60_000),
-        ...(reason ? { delayReason: reason } : {}),
-      },
+    const newEstimatedReadyAt = new Date(base.getTime() + addMins * 60_000);
+    const changes = {
+      etaAdjustMins: { increment: addMins },
+      estimatedReadyAt: newEstimatedReadyAt,
+      ...(reason ? { delayReason: reason } : {}),
+    };
+
+    // CAS on status: the active-status check above ran outside a transaction,
+    // so a status transition landing between that read and this write must
+    // not let a bump apply to an order that's no longer active.
+    const { count } = await prisma.order.updateMany({
+      where: { id: orderId, status: { in: ACTIVE_STATUSES } },
+      data: changes,
     });
 
-    return NextResponse.json({ success: true, data: toPlainOrder(updated) });
+    if (count === 0) {
+      return NextResponse.json(
+        { success: false, error: "This order was already updated elsewhere. Refresh and try again." },
+        { status: 409 }
+      );
+    }
+
+    // Past this point the bump is COMMITTED. The re-read only builds a
+    // richer response, so a re-read failure must never turn a successful
+    // update into a 500 — degrade to what we know was written instead.
+    try {
+      const updated = await prisma.order.findUnique({ where: { id: orderId } });
+      if (updated) {
+        return NextResponse.json({ success: true, data: toPlainOrder(updated) });
+      }
+      logger.error("ETA bump committed but order vanished on re-read:", orderId);
+    } catch (readError) {
+      logger.error("ETA bump committed but re-read failed (non-fatal):", readError);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { id: orderId, estimatedReadyAt: newEstimatedReadyAt.toISOString(), ...(reason ? { delayReason: reason } : {}) },
+    });
   } catch (error) {
     logger.error("Order ETA bump error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
