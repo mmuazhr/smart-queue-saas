@@ -3,6 +3,12 @@
 import { useCart } from "@/hooks/useCart";
 import { formatPrice, isHttpUrl } from "@/lib/utils";
 import { Plus, Minus, Info, ImageIcon } from "lucide-react";
+import {
+  initialQuantity,
+  isAtMaxQuantity,
+  isAtMinQuantity,
+  quantityLimitHint,
+} from "@/lib/order-limits";
 
 interface MenuItem {
   id: string;
@@ -11,6 +17,8 @@ interface MenuItem {
   price: number;
   isAvailable: boolean;
   imageUrl?: string | null;
+  minOrderQty?: number | null;
+  maxOrderQty?: number | null;
 }
 
 export default function MenuCard({
@@ -25,6 +33,7 @@ export default function MenuCard({
 }) {
   const { addItem, updateQuantity, getItemCount } = useCart();
   const count = getItemCount(item.id);
+  const limitHint = quantityLimitHint(item);
 
   return (
     <div className={`glass rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${!item.isAvailable ? "opacity-60 grayscale-[0.5]" : "hover:shadow-xl hover:translate-y-[-2px]"}`}>
@@ -53,6 +62,11 @@ export default function MenuCard({
           <span className="block text-sm font-black text-[var(--color-primary)] mt-0.5">
             {formatPrice(item.price)}
           </span>
+          {limitHint && (
+            <span className="block text-[10px] text-[var(--color-text-muted)] mt-0.5">
+              {limitHint}
+            </span>
+          )}
         </div>
 
         {item.description && (
@@ -68,20 +82,20 @@ export default function MenuCard({
             </button>
           ) : count > 0 ? (
             <div className="flex items-center justify-between w-full bg-[var(--color-bg-tertiary)] rounded-xl px-1 py-1">
-              <button 
+              <button
                 onClick={() => updateQuantity(item.id, count - 1)}
-                disabled={!canOrder}
-                aria-disabled={!canOrder}
+                disabled={!canOrder || isAtMinQuantity(count, item)}
+                aria-disabled={!canOrder || isAtMinQuantity(count, item)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
                 aria-label="Decrease quantity"
               >
                 <Minus className="h-4 w-4" />
               </button>
               <span className="font-bold text-sm w-8 text-center">{count}</span>
-              <button 
+              <button
                 onClick={() => updateQuantity(item.id, count + 1)}
-                disabled={!canOrder}
-                aria-disabled={!canOrder}
+                disabled={!canOrder || isAtMaxQuantity(count, item)}
+                aria-disabled={!canOrder || isAtMaxQuantity(count, item)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
                 aria-label="Increase quantity"
               >
@@ -102,7 +116,9 @@ export default function MenuCard({
                 menuItemId: item.id,
                 name: item.name,
                 price: item.price,
-                quantity: 1
+                quantity: initialQuantity(item),
+                minOrderQty: item.minOrderQty,
+                maxOrderQty: item.maxOrderQty
               })}
               className="w-full py-2.5 rounded-xl gradient-primary text-white text-xs font-bold uppercase tracking-wider shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
             >

@@ -3,6 +3,7 @@
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
 import { computeCartCharges } from "@/lib/charges";
+import { isAtMaxQuantity, isAtMinQuantity, quantityLimitHint } from "@/lib/order-limits";
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
@@ -70,6 +71,11 @@ export default function CartDrawer({
                   <div className="flex-1">
                     <h4 className="font-bold text-sm leading-tight">{item.name}</h4>
                     <p className="text-xs text-[var(--color-primary)] font-bold mt-0.5">{formatPrice(item.price)}</p>
+                    {quantityLimitHint(item) && (
+                      <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                        {quantityLimitHint(item)}
+                      </p>
+                    )}
                   </div>
                   <button 
                     onClick={() => removeItem(item.menuItemId)}
@@ -81,17 +87,19 @@ export default function CartDrawer({
 
                 <div className="flex items-center justify-between bg-[var(--color-bg-tertiary)] rounded-lg p-1">
                   <div className="flex items-center gap-1">
-                    <button 
+                    <button
                       onClick={() => updateQuantity(item.menuItemId, item.quantity - 1)}
-                      className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md"
+                      disabled={isAtMinQuantity(item.quantity, item)}
+                      aria-disabled={isAtMinQuantity(item.quantity, item)}
+                      className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md disabled:opacity-40 disabled:hover:bg-transparent"
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </button>
                     <span className="text-sm font-bold w-6 text-center">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.menuItemId, item.quantity + 1)}
-                      disabled={!canOrder}
-                      aria-disabled={!canOrder}
+                      disabled={!canOrder || isAtMaxQuantity(item.quantity, item)}
+                      aria-disabled={!canOrder || isAtMaxQuantity(item.quantity, item)}
                       className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md disabled:opacity-40 disabled:hover:bg-transparent"
                     >
                       <Plus className="h-3.5 w-3.5" />

@@ -108,6 +108,8 @@ export async function POST(
         categoryId: parsed.data.categoryId ?? null,
         imageUrl: parsed.data.imageUrl ?? null,
         prepTimeMins: parsed.data.prepTimeMins ?? null,
+        minOrderQty: parsed.data.minOrderQty ?? null,
+        maxOrderQty: parsed.data.maxOrderQty ?? null,
       },
     });
 

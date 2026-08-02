@@ -90,6 +90,10 @@ model MenuItem {
   imageUrl     String?         @map("image_url")
   isAvailable  Boolean         @default(true) @map("is_available")
   prepTimeMins Int?            @map("prep_time_mins")
+  // Per-order quantity limits (hawker rules like "min 3 satay sticks").
+  // null = no limit on that side.
+  minOrderQty  Int?            @map("min_order_qty")
+  maxOrderQty  Int?            @map("max_order_qty")
   sortOrder    Int             @default(0) @map("sort_order")
   createdAt    DateTime        @default(now()) @map("created_at")
   updatedAt    DateTime        @updatedAt @map("updated_at")

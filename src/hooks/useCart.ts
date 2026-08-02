@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { clampQuantity } from "@/lib/order-limits";
 
 export interface CartItem {
   menuItemId: string;
@@ -9,6 +10,10 @@ export interface CartItem {
   price: number;
   quantity: number;
   specialInstructions?: string;
+  // Copied from the menu item when it is added. A cart persisted before the
+  // limits existed simply has none — the order endpoint is the real check.
+  minOrderQty?: number | null;
+  maxOrderQty?: number | null;
 }
 
 interface CartStore {
@@ -46,12 +51,14 @@ export const useCart = create<CartStore>()(
           set({
             items: existingItems.map((i) =>
               i.menuItemId === newItem.menuItemId
-                ? { ...i, quantity: i.quantity + newItem.quantity }
+                ? { ...i, quantity: clampQuantity(i.quantity + newItem.quantity, i) }
                 : i
             ),
           });
         } else {
-          set({ items: [...existingItems, newItem] });
+          set({
+            items: [...existingItems, { ...newItem, quantity: clampQuantity(newItem.quantity, newItem) }],
+          });
         }
       },
 
@@ -62,7 +69,7 @@ export const useCart = create<CartStore>()(
         }
         set({
           items: get().items.map((i) =>
-            i.menuItemId === itemId ? { ...i, quantity } : i
+            i.menuItemId === itemId ? { ...i, quantity: clampQuantity(quantity, i) } : i
           ),
         });
       },

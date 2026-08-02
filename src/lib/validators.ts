@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { isHttpUrl } from "./utils";
+import { MAX_QTY_LIMIT, qtyLimitRangeError } from "./order-limits";
 
 // ---- Phone Validation (Malaysian format) ----
 
@@ -100,7 +101,21 @@ export const updateCategorySchema = createCategorySchema.partial();
 
 // ---- Menu Item Schemas ----
 
-export const createMenuItemSchema = z.object({
+// Per-order quantity limit. A blank number input submits "" and the dashboard
+// sends null to clear a saved limit — both mean "no limit". Max mirrors
+// createOrderItemSchema's quantity ceiling: a larger limit could never be met.
+const orderQtyLimitSchema = z.preprocess(
+  (v) => (v === "" || (typeof v === "number" && Number.isNaN(v)) ? null : v),
+  z
+    .number()
+    .int("Quantity limits must be whole numbers")
+    .min(1, "Quantity limits must be at least 1")
+    .max(MAX_QTY_LIMIT, `Quantity limits cannot be more than ${MAX_QTY_LIMIT}`)
+    .nullable()
+    .optional()
+);
+
+const menuItemFields = z.object({
   name: z.string().min(1, "Item name is required").max(100),
   description: z.string().max(300).optional(),
   // Max mirrors the Decimal(10,2) column ceiling (99,999,999.99). Without it,
@@ -109,11 +124,29 @@ export const createMenuItemSchema = z.object({
   categoryId: z.string().uuid().optional().nullable(),
   imageUrl: optionalImageUrlSchema,
   prepTimeMins: z.number().int().min(1).max(120).optional().nullable(),
+  minOrderQty: orderQtyLimitSchema,
+  maxOrderQty: orderQtyLimitSchema,
   sortOrder: z.number().int().min(0).default(0),
   isAvailable: z.boolean().default(true),
 });
 
-export const updateMenuItemSchema = createMenuItemSchema.partial();
+// The issue is attached to maxOrderQty on purpose: a pathless issue lands in
+// formErrors, which neither menu route reads.
+function checkQtyLimitRange(
+  data: { minOrderQty?: number | null; maxOrderQty?: number | null },
+  ctx: z.RefinementCtx
+) {
+  const message = qtyLimitRangeError(data.minOrderQty, data.maxOrderQty);
+  if (message) {
+    ctx.addIssue({ code: "custom", message, path: ["maxOrderQty"] });
+  }
+}
+
+// Both schemas refine the unrefined base so neither calls .partial() on an
+// already-refined schema.
+export const createMenuItemSchema = menuItemFields.superRefine(checkQtyLimitRange);
+
+export const updateMenuItemSchema = menuItemFields.partial().superRefine(checkQtyLimitRange);
 
 // ---- Order Schemas ----
 

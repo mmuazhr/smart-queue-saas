@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronUp, Image as ImageIcon, Loader2 } from "lucide-react";
 import { formatPrice, isHttpUrl } from "@/lib/utils";
 import { normalizeImageForUpload, mapUploadError, ImageDecodeError, IMAGE_DECODE_ERROR_MESSAGE } from "@/lib/client-image";
+import { menuItemLimitsError } from "@/lib/order-limits";
 
 interface MenuItem {
   id: string;
@@ -14,12 +15,21 @@ interface MenuItem {
   isAvailable: boolean;
   categoryId: string | null;
   imageUrl?: string | null;
+  minOrderQty?: number | null;
+  maxOrderQty?: number | null;
 }
 
 interface Category {
   id: string;
   name: string;
   menuItems: MenuItem[];
+}
+
+// A cleared number input reads as "" — store null (no limit) rather than NaN,
+// which would make the input uncontrolled.
+function parseQtyInput(value: string): number | null {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 export default function MenuManagementPage() {
@@ -36,9 +46,11 @@ export default function MenuManagementPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [limitError, setLimitError] = useState<string | null>(null);
 
   function openItemModal(item: Partial<MenuItem>) {
     setUploadError(null);
+    setLimitError(null);
     setEditingItem(item);
     setIsItemModalOpen(true);
   }
@@ -108,6 +120,11 @@ export default function MenuManagementPage() {
   async function handleItemSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!storeId || !editingItem) return;
+
+    // Mirrors the API rules so the merchant sees the problem without a round trip.
+    const invalidLimits = menuItemLimitsError(editingItem.minOrderQty, editingItem.maxOrderQty);
+    setLimitError(invalidLimits);
+    if (invalidLimits) return;
 
     const method = editingItem.id ? "PUT" : "POST";
     const url = editingItem.id 
@@ -207,7 +224,7 @@ export default function MenuManagementPage() {
             <Plus className="h-4 w-4" /> Add Category
           </button>
           <button
-            onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: categories[0]?.id || null, imageUrl: "" })}
+            onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: categories[0]?.id || null, imageUrl: "", minOrderQty: null, maxOrderQty: null })}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-medium gradient-primary transition-all hover:opacity-90 text-sm"
           >
             <Plus className="h-4 w-4" /> Add Item
@@ -294,7 +311,7 @@ export default function MenuManagementPage() {
               ))}
               
               <button
-                onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: category.id, imageUrl: "" })}
+                onClick={() => openItemModal({ name: "", price: 0, isAvailable: true, categoryId: category.id, imageUrl: "", minOrderQty: null, maxOrderQty: null })}
                 className="rounded-2xl border-2 border-dashed border-[var(--color-border)] p-4 flex flex-col items-center justify-center gap-2 text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-all min-h-[160px]"
               >
                 <Plus className="h-6 w-6" />
@@ -465,6 +482,29 @@ export default function MenuManagementPage() {
                   </select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Min per order</label>
+                  <input
+                    type="number" min={1} step={1}
+                    placeholder="No limit"
+                    value={editingItem.minOrderQty ?? ""}
+                    onChange={(e) => setEditingItem({...editingItem, minOrderQty: parseQtyInput(e.target.value)})}
+                    className="w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm bg-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Max per order</label>
+                  <input
+                    type="number" min={1} step={1}
+                    placeholder="No limit"
+                    value={editingItem.maxOrderQty ?? ""}
+                    onChange={(e) => setEditingItem({...editingItem, maxOrderQty: parseQtyInput(e.target.value)})}
+                    className="w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm bg-transparent"
+                  />
+                </div>
+              </div>
+              {limitError && <p className="text-xs text-red-500">{limitError}</p>}
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Description</label>
                 <textarea 

@@ -120,6 +120,68 @@ describe("updateMenuItemSchema imageUrl (partial keeps the rule)", () => {
   });
 });
 
+describe("menu item order quantity limits", () => {
+  it("accepts an item with no limits", () => {
+    const r = createMenuItemSchema.safeParse(baseMenuItem);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.minOrderQty).toBeUndefined();
+      expect(r.data.maxOrderQty).toBeUndefined();
+    }
+  });
+
+  it("accepts whole numbers on both sides", () => {
+    const r = createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 3, maxOrderQty: 10 });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.minOrderQty).toBe(3);
+  });
+
+  it("treats null and an empty input as clearing the limit", () => {
+    const r = createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: null, maxOrderQty: "" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.minOrderQty).toBeNull();
+      expect(r.data.maxOrderQty).toBeNull();
+    }
+  });
+
+  it("rejects zero, negative and fractional limits", () => {
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 0 }).success).toBe(false);
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, maxOrderQty: -2 }).success).toBe(false);
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 2.5 }).success).toBe(false);
+  });
+
+  it("rejects a limit above the 99 order quantity ceiling", () => {
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 100 }).success).toBe(false);
+    expect(createMenuItemSchema.safeParse({ ...baseMenuItem, maxOrderQty: 99 }).success).toBe(true);
+  });
+
+  it("rejects a max below the min and reports it on the maxOrderQty field", () => {
+    const r = createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 5, maxOrderQty: 2 });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0].path).toEqual(["maxOrderQty"]);
+  });
+
+  it("accepts a max equal to the min", () => {
+    expect(
+      createMenuItemSchema.safeParse({ ...baseMenuItem, minOrderQty: 4, maxOrderQty: 4 }).success
+    ).toBe(true);
+  });
+
+  it("keeps the rules on a partial update", () => {
+    expect(updateMenuItemSchema.safeParse({ minOrderQty: 3 }).success).toBe(true);
+    expect(updateMenuItemSchema.safeParse({ maxOrderQty: null }).success).toBe(true);
+    expect(updateMenuItemSchema.safeParse({ minOrderQty: 0 }).success).toBe(false);
+    expect(updateMenuItemSchema.safeParse({ minOrderQty: 5, maxOrderQty: 2 }).success).toBe(false);
+  });
+
+  it("surfaces the cross-field message through flatten().fieldErrors, which the PUT route reads", () => {
+    const r = updateMenuItemSchema.safeParse({ minOrderQty: 5, maxOrderQty: 2 });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.flatten().fieldErrors.maxOrderQty?.length).toBeGreaterThan(0);
+  });
+});
+
 describe("updateAccountSchema", () => {
   it("accepts a partial update with just a name", () => {
     expect(updateAccountSchema.safeParse({ name: "Muaz H" }).success).toBe(true);

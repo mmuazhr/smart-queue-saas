@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
 import { computeCartCharges } from "@/lib/charges";
+import { cartLimitViolations } from "@/lib/order-limits";
 import { ArrowLeft, Phone, User, MessageSquare, BadgeCheck, Loader2, Banknote, QrCode } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
@@ -51,6 +52,14 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
     e.preventDefault();
     if (!storeId || isSubmitting) return;
 
+    // Defensive: the steppers clamp to the item's limits, but a cart persisted
+    // before a merchant changed them can still be out of bounds.
+    const violations = cartLimitViolations(items);
+    if (violations.length > 0) {
+      setError(violations.join(" "));
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -96,6 +105,7 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
   if (!isHydrated || items.length === 0) return null;
 
   const { subtotalCents, lines, totalCents } = computeCartCharges(items, charges);
+  const limitViolations = cartLimitViolations(items);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
@@ -211,13 +221,24 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
             </div>
           </section>
 
+          {limitViolations.length > 0 && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm space-y-1">
+              {limitViolations.map((violation) => (
+                <p key={violation}>{violation}</p>
+              ))}
+              <p className="text-[var(--color-text-muted)]">
+                Adjust the quantities in your cart to continue.
+              </p>
+            </div>
+          )}
+
           {error && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
               {error}
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting}
+          <button type="submit" disabled={isSubmitting || limitViolations.length > 0}
             className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
               paymentMethod === "CASH"

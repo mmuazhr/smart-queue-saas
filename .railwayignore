@@ -1,0 +1,10 @@
+node_modules
+.next
+.open-next
+.wrangler
+.worktrees
+.superpowers
+.agents
+.dev.vars
+.env
+.env.*

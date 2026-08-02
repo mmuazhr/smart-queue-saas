@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { updateMenuItemSchema } from "@/lib/validators";
 import { toTitleCase } from "@/lib/format";
+import { qtyLimitRangeError } from "@/lib/order-limits";
 
 // PUT /api/stores/[storeId]/menu/[itemId]
 export async function PUT(
@@ -46,6 +47,33 @@ export async function PUT(
       if (!category) {
         return NextResponse.json(
           { success: false, error: "categoryId does not belong to this store" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // A partial update can set one bound while the other is already stored, so
+    // the pair is checked after merging with the saved row — an unsatisfiable
+    // pair (max below min) would make the item permanently unorderable.
+    if (parsed.data.minOrderQty !== undefined || parsed.data.maxOrderQty !== undefined) {
+      const existing = await prisma.menuItem.findFirst({
+        where: { id: itemId, storeId },
+        select: { minOrderQty: true, maxOrderQty: true },
+      });
+      if (!existing) {
+        return NextResponse.json(
+          { success: false, error: "Menu item not found" },
+          { status: 404 }
+        );
+      }
+
+      const rangeError = qtyLimitRangeError(
+        parsed.data.minOrderQty !== undefined ? parsed.data.minOrderQty : existing.minOrderQty,
+        parsed.data.maxOrderQty !== undefined ? parsed.data.maxOrderQty : existing.maxOrderQty
+      );
+      if (rangeError) {
+        return NextResponse.json(
+          { success: false, error: "Validation failed", errors: { maxOrderQty: [rangeError] } },
           { status: 400 }
         );
       }

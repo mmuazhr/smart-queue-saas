@@ -8,6 +8,7 @@ import { createOrderSchema } from "@/lib/validators";
 import { auth } from "@/lib/auth";
 import { computeCharges, parseStoreCharges } from "@/lib/charges";
 import { isStoreOpen } from "@/lib/store-hours";
+import { quantityLimitViolation } from "@/lib/order-limits";
 import { toPlainOrder } from "@/lib/serializers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -134,6 +135,29 @@ export async function POST(request: NextRequest) {
     if (unavailable.length > 0) {
       return NextResponse.json(
         { success: false, error: `Items unavailable: ${unavailable.map((i) => i.name).join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Per-order quantity limits (e.g. "min 3 satay sticks"). The storefront
+    // stepper is advisory only — a stale cart or a crafted request reaches here
+    // with any quantity, so the merchant's rule is enforced against the current
+    // menu row. Limits are per order, so repeated lines are summed first.
+    const orderedQtyByItem = new Map<string, number>();
+    for (const item of items) {
+      orderedQtyByItem.set(
+        item.menuItemId,
+        (orderedQtyByItem.get(item.menuItemId) ?? 0) + item.quantity
+      );
+    }
+
+    const limitErrors = menuItems
+      .map((mi) => quantityLimitViolation(mi.name, orderedQtyByItem.get(mi.id) ?? 0, mi))
+      .filter((message): message is string => message !== null);
+
+    if (limitErrors.length > 0) {
+      return NextResponse.json(
+        { success: false, error: limitErrors.join(" "), errors: { items: limitErrors } },
         { status: 400 }
       );
     }
