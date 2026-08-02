@@ -20,6 +20,7 @@ const PUBLIC_PATHS = [
   "/api/webhooks",  // all provider webhooks (was /api/payments/webhook — wrong path)
   "/api/orders",    // anonymous customer checkout + order tracking
   "/api/queue/stream",
+  "/api/store-wait", // anonymous menu-page wait chip
 ] as const;
 
 export default auth((req) => {
