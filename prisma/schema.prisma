@@ -22,6 +22,7 @@ model User {
   isVerified   Boolean   @default(false) @map("is_verified")
   trialEndsAt  DateTime? @map("trial_ends_at")
   earlyBird    Boolean   @default(false) @map("early_bird")
+  frozenAt     DateTime? @map("frozen_at")
   avatarUrl    String?   @map("avatar_url")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
@@ -47,6 +48,7 @@ model Store {
   longitude           Float?
   phone               String?
   status              String   @default("PENDING")
+  suspendedAt         DateTime? @map("suspended_at")
   ordersPaused        Boolean  @default(false) @map("orders_paused")
   avgPrepTimeMins     Int      @default(10) @map("avg_prep_time_mins")
   maxConcurrentOrders Int      @default(5) @map("max_concurrent_orders")
