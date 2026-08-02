@@ -29,6 +29,8 @@ interface Order {
   orderItems: OrderItem[];
   paymentMethod?: string;
   hasProof?: boolean;
+  estimatedReadyAt?: string | null;
+  delayReason?: string | null;
 }
 
 // PAID and ACCEPTED are merged into one "Accepted" stage — confirming payment
@@ -54,6 +56,8 @@ export default function QueueDashboardPage() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [ordersPaused, setOrdersPaused] = useState(false);
   const [pauseToggling, setPauseToggling] = useState(false);
+  const [queueDelayMins, setQueueDelayMins] = useState(0);
+  const [delayBusy, setDelayBusy] = useState(false);
   const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
   const prevUnconfirmedCount = useRef(0);
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,6 +73,7 @@ export default function QueueDashboardPage() {
       if (data.success && data.data.length > 0) {
         setStoreId(data.data[0].id);
         setOrdersPaused(!!data.data[0].ordersPaused);
+        setQueueDelayMins(data.data[0].queueDelayMins ?? 0);
       }
       setLoading(false);
     }
@@ -211,6 +216,62 @@ export default function QueueDashboardPage() {
     updateOrderStatus(order.id, "CANCELLED", order.status);
   }
 
+  // window.prompt matches the board's existing confirm() idiom. Cancel aborts;
+  // empty string bumps without a reason.
+  async function bumpOrderEta(orderId: string, addMins: number) {
+    const reason = window.prompt(
+      `Add ${addMins} min to this order. Reason shown to the customer (optional):`,
+      ""
+    );
+    if (reason === null) return;
+    try {
+      const res = await fetch(`/api/orders/${orderId}/eta`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addMins, ...(reason.trim() ? { reason: reason.trim() } : {}) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "Could not add time — please try again.");
+      } else {
+        await fetchOrders();
+      }
+    } catch {
+      setActionError("Network problem — the delay was not saved. Please retry.");
+    }
+  }
+
+  async function setStoreDelay(delayMins: number) {
+    if (!storeId || delayBusy) return;
+    let reason: string | null = "";
+    if (delayMins > 0) {
+      reason = window.prompt(
+        "Delay ALL active orders. Reason shown to customers (optional):",
+        ""
+      );
+      if (reason === null) return;
+    }
+    setDelayBusy(true);
+    try {
+      const res = await fetch(`/api/stores/${storeId}/queue-delay`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delayMins, ...(reason && reason.trim() ? { reason: reason.trim() } : {}) }),
+      });
+      if (res.ok) {
+        setQueueDelayMins(delayMins);
+        await fetchOrders();
+      } else {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "Could not update the store delay — please try again.");
+      }
+    } catch {
+      setActionError("Network problem — the store delay was not saved. Please retry.");
+    } finally {
+      setDelayBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -238,6 +299,24 @@ export default function QueueDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {queueDelayMins > 0 ? (
+            <button
+              onClick={() => setStoreDelay(0)}
+              disabled={delayBusy}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-500 transition-colors hover:bg-amber-500/20 disabled:opacity-60"
+            >
+              Kitchen delayed +{queueDelayMins}m · Clear
+            </button>
+          ) : (
+            <button
+              onClick={() => setStoreDelay(10)}
+              disabled={delayBusy}
+              className="rounded-lg border px-4 py-2 text-sm transition-colors hover:bg-[var(--color-bg-tertiary)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+            >
+              Delay all +10m
+            </button>
+          )}
           <button
             onClick={toggleOrdersPaused}
             disabled={pauseToggling}
@@ -323,7 +402,13 @@ export default function QueueDashboardPage() {
                   colOrders.map((order) => (
                     <div
                       key={order.id}
-                      className="glass rounded-xl p-4 animate-slide-up"
+                      className={`glass rounded-xl p-4 animate-slide-up ${
+                        order.estimatedReadyAt &&
+                        (col.key === "PAID" || col.key === "PREPARING") &&
+                        new Date(order.estimatedReadyAt).getTime() < Date.now()
+                          ? "ring-1 ring-red-500/40"
+                          : ""
+                      }`}
                     >
                       {/* Queue Number */}
                       <div className="mb-3 flex items-start justify-between">
@@ -409,6 +494,37 @@ export default function QueueDashboardPage() {
                           {formatPrice(order.total)}
                         </span>
                       </div>
+
+                      {/* ETA + delay controls (active orders only) */}
+                      {(col.key === "PAID" || col.key === "PREPARING") && (
+                        <div className="mt-3 space-y-2">
+                          {order.estimatedReadyAt && (() => {
+                            const msLeft = new Date(order.estimatedReadyAt).getTime() - Date.now();
+                            const overdue = msLeft < 0;
+                            const mins = Math.ceil(Math.abs(msLeft) / 60_000);
+                            return (
+                              <p
+                                className={`text-xs font-bold ${overdue ? "text-red-500" : "text-[var(--color-text-secondary)]"}`}
+                              >
+                                {overdue ? `Overdue by ${mins}m` : `Promised in ${mins}m`}
+                                {order.delayReason ? ` · ${order.delayReason}` : ""}
+                              </p>
+                            );
+                          })()}
+                          <div className="flex gap-1.5">
+                            {[5, 10, 20].map((m) => (
+                              <button
+                                key={m}
+                                onClick={() => bumpOrderEta(order.id, m)}
+                                className="flex-1 rounded-md border px-2 py-1 text-[10px] font-bold transition-colors hover:bg-[var(--color-bg-tertiary)]"
+                                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                              >
+                                +{m}m
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Actions */}
                       <div className="mt-3 flex gap-2">
