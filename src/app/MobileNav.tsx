@@ -21,6 +21,7 @@ export default function MobileNav() {
         <div className="absolute top-full left-0 right-0 bg-[var(--color-bg)] border-b border-[var(--color-border)] px-6 py-4 flex flex-col gap-1 text-sm font-bold text-[var(--color-text-secondary)] shadow-xl">
           <a href="#features" onClick={close} className="py-3 hover:text-[var(--color-primary)] transition-colors">Features</a>
           <a href="#pricing" onClick={close} className="py-3 hover:text-[var(--color-primary)] transition-colors">Pricing</a>
+          <a href="#faq" onClick={close} className="py-3 hover:text-[var(--color-primary)] transition-colors">FAQ</a>
           <Link href="/login" onClick={close} className="py-3 hover:text-[var(--color-primary)] transition-colors">Sign In</Link>
           <Link href="/register" onClick={close}
             className="mt-2 py-3 rounded-full gradient-primary text-white text-center shadow-lg shadow-orange-500/20">

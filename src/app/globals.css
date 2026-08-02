@@ -181,6 +181,15 @@ body {
   to { opacity: 1; }
 }
 
+/* Track holds two identical copies, so -50% lands exactly on the seam. */
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
@@ -191,4 +200,44 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 18s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-glow,
+  .animate-slide-up,
+  .animate-fade-in,
+  .animate-marquee,
+  .animate-spin-slow {
+    animation: none;
+  }
+}
+
+/* ---- Landing Anchor Panels ---- */
+
+.anchor-panel {
+  background: #16100a;
+}
+
+/* Parent must be positioned. */
+.hatch-top::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(251, 191, 36, 0.14) 0 2px,
+    transparent 2px 8px
+  );
 }
