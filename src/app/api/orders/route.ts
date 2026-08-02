@@ -8,6 +8,11 @@ import { createOrderSchema } from "@/lib/validators";
 import { auth } from "@/lib/auth";
 import { computeCharges, parseStoreCharges } from "@/lib/charges";
 import { isStoreOpen } from "@/lib/store-hours";
+import {
+  FROZEN_ACTIVE_ORDER_STATUSES,
+  FROZEN_ORDER_CAP,
+  firstAvailableMenuItemId,
+} from "@/lib/frozen";
 import { quantityLimitViolation } from "@/lib/order-limits";
 import { toPlainOrder } from "@/lib/serializers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -91,7 +96,16 @@ export async function POST(request: NextRequest) {
     // Verify store exists, is active, and fetch operating hours
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { id: true, status: true, name: true, slug: true, operatingHours: true, charges: true, ordersPaused: true },
+      select: {
+        id: true,
+        status: true,
+        name: true,
+        slug: true,
+        operatingHours: true,
+        charges: true,
+        ordersPaused: true,
+        owner: { select: { frozenAt: true } },
+      },
     });
 
     if (!store || store.status !== "ACTIVE") {
@@ -117,6 +131,38 @@ export async function POST(request: NextRequest) {
         { success: false, error: "Store is currently closed" },
         { status: 400 }
       );
+    }
+
+    // Limited free mode: the storefront already hides everything but the one
+    // orderable item and the store fills up at FROZEN_ORDER_CAP live orders.
+    // Both rules are re-checked here, since a stale tab or a crafted request
+    // never sees the storefront's version of them.
+    if (store.owner.frozenAt) {
+      const allowedMenuItemId = await firstAvailableMenuItemId(storeId);
+      if (items.some((item) => item.menuItemId !== allowedMenuItemId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "FROZEN_MENU",
+            error: "Only one item can be ordered from this store right now. Please refresh the menu.",
+          },
+          { status: 422 }
+        );
+      }
+
+      const activeOrders = await prisma.order.count({
+        where: { storeId, status: { in: [...FROZEN_ACTIVE_ORDER_STATUSES] } },
+      });
+      if (activeOrders >= FROZEN_ORDER_CAP) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "FROZEN_CAPACITY",
+            error: "This store is at capacity right now — please try again shortly.",
+          },
+          { status: 422 }
+        );
+      }
     }
 
     const menuItemIds = items.map((item) => item.menuItemId);

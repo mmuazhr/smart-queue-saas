@@ -15,15 +15,30 @@ interface StoreMenuClientProps {
   isOpen: boolean;
   closedLabel: string;
   ordersPaused: boolean;
+  // Limited free mode: every item but allowedMenuItemId is shown as unavailable.
+  frozen: boolean;
+  allowedMenuItemId: string | null;
 }
 
-export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaused }: StoreMenuClientProps) {
+export default function StoreMenuClient({
+  store,
+  isOpen,
+  closedLabel,
+  ordersPaused,
+  frozen,
+  allowedMenuItemId,
+}: StoreMenuClientProps) {
   const { setStoreId, items, getTotalItemsCount } = useCart();
   const orderingAllowed = canPlaceOrder(isOpen, ordersPaused);
   // Closed-for-hours already explains why ordering is off; only show the
   // pause banner when the store would otherwise be open.
   const showPausedBanner = isOpen && ordersPaused;
   const unavailableLabel = !isOpen ? "Closed" : "Paused";
+  const itemFrozenOut = (itemId: string) => frozen && itemId !== allowedMenuItemId;
+  const canOrderItem = (itemId: string) => orderingAllowed && !itemFrozenOut(itemId);
+  // Closed/paused describes the whole store, so it wins over the per-item reason.
+  const itemUnavailableLabel = (itemId: string) =>
+    orderingAllowed && itemFrozenOut(itemId) ? "Unavailable at the moment" : unavailableLabel;
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
@@ -181,7 +196,12 @@ export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaus
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {category.menuItems.map((item: any) => (
-                  <MenuCard key={item.id} item={item} canOrder={orderingAllowed} unavailableLabel={unavailableLabel} />
+                  <MenuCard
+                    key={item.id}
+                    item={item}
+                    canOrder={canOrderItem(item.id)}
+                    unavailableLabel={itemUnavailableLabel(item.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -196,7 +216,12 @@ export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaus
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {store.menuItems.map((item: any) => (
-                <MenuCard key={item.id} item={item} canOrder={orderingAllowed} unavailableLabel={unavailableLabel} />
+                <MenuCard
+                  key={item.id}
+                  item={item}
+                  canOrder={canOrderItem(item.id)}
+                  unavailableLabel={itemUnavailableLabel(item.id)}
+                />
               ))}
             </div>
           </section>

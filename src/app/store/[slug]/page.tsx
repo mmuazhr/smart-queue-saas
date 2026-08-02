@@ -5,6 +5,7 @@ import { Metadata } from "next";
 import { isStoreOpen, nextOpeningTime, type OperatingHoursEntry } from "@/lib/store-hours";
 import { openingLabel } from "@/components/customer/ClosedBanner";
 import { toPlainMenuItem } from "@/lib/serializers";
+import { firstAvailableMenuItemId } from "@/lib/frozen";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -57,6 +58,7 @@ export default async function StorePage({ params }: Props) {
         where: { categoryId: null, isAvailable: true },
         orderBy: { sortOrder: "asc" },
       },
+      owner: { select: { frozenAt: true } },
     },
   });
 
@@ -83,8 +85,15 @@ export default async function StorePage({ params }: Props) {
   // value — passing it straight into a Client Component prop triggers a
   // server/client boundary warning. Convert every menu item the same way
   // toPlainOrder/toPlainOrderItem already do for orders.
+  // Limited free mode: the storefront stays live but only one item can be
+  // ordered. The id is resolved here and enforced again in POST /api/orders.
+  const allowedMenuItemId = store.owner.frozenAt
+    ? await firstAvailableMenuItemId(store.id)
+    : null;
+
+  const { owner: _owner, ...storeFields } = store;
   const plainStore = {
-    ...store,
+    ...storeFields,
     categories: store.categories.map((category) => ({
       ...category,
       menuItems: category.menuItems.map(toPlainMenuItem),
@@ -98,6 +107,8 @@ export default async function StorePage({ params }: Props) {
       isOpen={isOpen}
       closedLabel={closedLabel}
       ordersPaused={store.ordersPaused}
+      frozen={store.owner.frozenAt !== null}
+      allowedMenuItemId={allowedMenuItemId}
     />
   );
 }
