@@ -64,13 +64,19 @@ export async function POST(request: NextRequest) {
 
     const baseSlug = slugify(parsed.data.name);
 
+    const creator = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { isVerified: true },
+    });
+
     const createData = {
       ...parsed.data,
       slug: baseSlug,
       ownerId: session.user.id,
-      // Self-serve onboarding (decided 2026-07-31): stores are live immediately.
-      // Nothing in the product can flip PENDING→ACTIVE, so PENDING was a dead end.
-      status: "ACTIVE",
+      // Stores go live only for approved merchants — an unapproved merchant's
+      // store stays PENDING until admin approval flips it (or the store is
+      // reactivated) via /api/admin/stores/[storeId]/status.
+      status: creator?.isVerified ? "ACTIVE" : "PENDING",
       operatingHours: (parsed.data.operatingHours as Prisma.InputJsonValue) ?? undefined,
     };
 
