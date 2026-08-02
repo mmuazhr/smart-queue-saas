@@ -250,6 +250,17 @@ export const adminStoreStatusSchema = z.object({
 
 export type AdminStoreStatusInput = z.infer<typeof adminStoreStatusSchema>;
 
+export const adminMerchantTrialSchema = z
+  .object({
+    approve: z.literal(true).optional(),
+    earlyBird: z.boolean().optional(),
+  })
+  .refine((v) => v.approve !== undefined || v.earlyBird !== undefined, {
+    message: "Nothing to update",
+  });
+
+export type AdminMerchantTrialInput = z.infer<typeof adminMerchantTrialSchema>;
+
 // ---- Inferred Types ----
 
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;

@@ -13,6 +13,10 @@ interface MerchantRow {
   userId: string;
   name: string;
   email: string;
+  phone: string | null;
+  isVerified: boolean;
+  trialEndsAt: string | null;
+  earlyBird: boolean;
   createdAt: string;
   store: {
     id: string;
@@ -30,6 +34,7 @@ export default function AdminMerchantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [pendingStoreId, setPendingStoreId] = useState<string | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -73,6 +78,24 @@ export default function AdminMerchantsPage() {
       console.error("Failed to update store status", err);
     } finally {
       setPendingStoreId(null);
+    }
+  };
+
+  const patchTrial = async (userId: string, body: { approve?: true; earlyBird?: boolean }) => {
+    try {
+      setPendingUserId(userId);
+      const res = await fetch(`/api/admin/merchants/${userId}/trial`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Request failed");
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to update merchant trial", err);
+    } finally {
+      setPendingUserId(null);
     }
   };
 
@@ -140,6 +163,23 @@ export default function AdminMerchantsPage() {
                   <td className="px-6 py-4">
                     <p className="font-bold">{m.name}</p>
                     <p className="text-xs text-[var(--color-text-muted)]">{m.email}</p>
+                    {m.phone && <p className="text-xs text-[var(--color-text-muted)]">{m.phone}</p>}
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {!m.isVerified ? (
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest bg-amber-500/15 text-amber-500">
+                          Pending approval
+                        </span>
+                      ) : m.trialEndsAt ? (
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest bg-green-500/15 text-green-500">
+                          Trial ends {new Date(m.trialEndsAt).toLocaleDateString("en-MY")}
+                        </span>
+                      ) : null}
+                      {m.earlyBird && (
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest bg-[var(--color-primary)]/15 text-[var(--color-primary)]">
+                          Early bird
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {store ? (
@@ -172,6 +212,26 @@ export default function AdminMerchantsPage() {
                   <td className="px-6 py-4 text-right font-bold">{store?.orderCount ?? 0}</td>
                   <td className="px-6 py-4 text-right font-bold">{formatPrice(store?.gmv ?? 0)}</td>
                   <td className="px-6 py-4 text-right">
+                    {!m.isVerified && (
+                      <button
+                        onClick={() => patchTrial(m.userId, { approve: true })}
+                        disabled={pendingUserId === m.userId}
+                        className="mr-2 rounded-lg px-3 py-2 text-xs font-bold text-white gradient-primary transition-all disabled:opacity-50"
+                      >
+                        {pendingUserId === m.userId ? "Saving…" : "Approve"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => patchTrial(m.userId, { earlyBird: !m.earlyBird })}
+                      disabled={pendingUserId === m.userId}
+                      className="mr-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50"
+                      style={{
+                        borderColor: m.earlyBird ? "var(--color-primary)" : "var(--color-border)",
+                        color: m.earlyBird ? "var(--color-primary)" : "var(--color-text-secondary)",
+                      }}
+                    >
+                      {m.earlyBird ? "Early bird ✓" : "Early bird"}
+                    </button>
                     {store && (
                       <button
                         onClick={() => updateStatus(store)}

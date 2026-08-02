@@ -28,7 +28,11 @@ export async function GET() {
       id: true,
       name: true,
       email: true,
+      phone: true,
       createdAt: true,
+      isVerified: true,
+      trialEndsAt: true,
+      earlyBird: true,
       stores: { select: { id: true, name: true, slug: true, status: true, createdAt: true } },
     },
   });
@@ -51,6 +55,10 @@ export async function GET() {
         userId: u.id,
         name: u.name,
         email: u.email,
+        phone: u.phone,
+        isVerified: u.isVerified,
+        trialEndsAt: u.trialEndsAt,
+        earlyBird: u.earlyBird,
         createdAt: u.createdAt,
         store: store ? { ...store, orderCount, gmv } : null,
       };
