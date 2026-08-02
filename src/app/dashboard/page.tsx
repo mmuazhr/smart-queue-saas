@@ -230,11 +230,17 @@ export default function QueueDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ addMins, ...(reason.trim() ? { reason: reason.trim() } : {}) }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        await fetchOrders();
+      } else if (res.status === 409) {
+        // Board was stale — refresh to show what actually happened instead
+        // of leaving a phantom card the merchant could act on again.
+        await fetchOrders();
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "This order was already updated elsewhere — the board has been refreshed.");
+      } else {
         const data = await res.json().catch(() => null);
         setActionError(data?.error || "Could not add time — please try again.");
-      } else {
-        await fetchOrders();
       }
     } catch {
       setActionError("Network problem — the delay was not saved. Please retry.");
