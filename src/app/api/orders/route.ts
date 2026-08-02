@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Limited free mode: the storefront already hides everything but the one
-    // orderable item and the store fills up at FROZEN_ORDER_CAP live orders.
+    // orderable item and the store fills up at FROZEN_ORDER_CAP confirmed orders.
     // Both rules are re-checked here, since a stale tab or a crafted request
     // never sees the storefront's version of them.
     if (store.owner.frozenAt) {

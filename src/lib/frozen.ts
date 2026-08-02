@@ -11,13 +11,10 @@ import prisma from "@/lib/prisma";
 
 export const FROZEN_ORDER_CAP = 5;
 
-export const FROZEN_ACTIVE_ORDER_STATUSES = [
-  "AWAITING_CONFIRMATION",
-  "PAID",
-  "ACCEPTED",
-  "PREPARING",
-  "READY",
-] as const;
+// AWAITING_CONFIRMATION is deliberately excluded: an unconfirmed order occupies
+// no kitchen capacity, and counting it would let anyone jam a frozen store by
+// abandoning five checkouts. Capacity is what the merchant has actually taken on.
+export const FROZEN_ACTIVE_ORDER_STATUSES = ["PAID", "ACCEPTED", "PREPARING", "READY"] as const;
 
 /**
  * The single item a frozen store may sell: the first orderable item under the
