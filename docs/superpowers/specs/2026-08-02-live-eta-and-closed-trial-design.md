@@ -25,9 +25,7 @@ New server-side module `src/lib/eta.ts`. Per-store rolling stats from timestamps
 - **ETA for an order** =
   `(active orders ahead in queue ÷ throughput) + avgPrepMins + order.etaAdjustMins + store.queueDelayMins`
   - "Orders ahead" = active orders (`PAID`, `ACCEPTED`, `PREPARING`) with an earlier `confirmedAt`/`queueNumber`.
-- **Cold-start fallbacks**, in order:
-  1. Max `MenuItem.prepTimeMins` among the order's items (if set).
-  2. Flat 10-minute default.
+- **Cold-start fallback:** the legacy batch model `ceil(ordersAhead ÷ Store.maxConcurrentOrders) × Store.avgPrepTimeMins`, driven by the existing merchant-editable store settings (`avgPrepTimeMins` defaults to 10). These fields already exist and are already edited in Settings — no per-item fallback needed.
 - **Caching:** store stats (throughput, avg prep) cached in memory for 30 s so the 3-second SSE tick stays cheap. Per-order ETA arithmetic runs every tick.
 
 ### 1.2 Schema changes (one migration)
