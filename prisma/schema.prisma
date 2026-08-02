@@ -13,15 +13,18 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String    @id @default(uuid())
+  email        String    @unique
   phone        String?
   name         String
-  passwordHash String   @map("password_hash")
-  role         String   @default("MERCHANT")
-  isVerified   Boolean  @default(false) @map("is_verified")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  passwordHash String    @map("password_hash")
+  role         String    @default("MERCHANT")
+  isVerified   Boolean   @default(false) @map("is_verified")
+  trialEndsAt  DateTime? @map("trial_ends_at")
+  earlyBird    Boolean   @default(false) @map("early_bird")
+  avatarUrl    String?   @map("avatar_url")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   stores Store[]
 
@@ -47,6 +50,8 @@ model Store {
   ordersPaused        Boolean  @default(false) @map("orders_paused")
   avgPrepTimeMins     Int      @default(10) @map("avg_prep_time_mins")
   maxConcurrentOrders Int      @default(5) @map("max_concurrent_orders")
+  queueDelayMins      Int      @default(0) @map("queue_delay_mins")
+  queueDelayReason    String?  @map("queue_delay_reason")
   operatingHours      Json?    @map("operating_hours")
   qrCodeUrl           String?  @map("qr_code_url")
   paymentGateway      String?  @map("payment_gateway")
@@ -57,7 +62,7 @@ model Store {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  owner              User               @relation(fields: [ownerId], references: [id])
+  owner              User                @relation(fields: [ownerId], references: [id])
   categories         Category[]
   menuItems          MenuItem[]
   orders             Order[]
@@ -81,22 +86,22 @@ model Category {
 }
 
 model MenuItem {
-  id           String          @id @default(uuid())
-  storeId      String          @map("store_id")
-  categoryId   String?         @map("category_id")
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  categoryId   String?  @map("category_id")
   name         String
   description  String?
-  price        Decimal         @map("price") @db.Decimal(10, 2)
-  imageUrl     String?         @map("image_url")
-  isAvailable  Boolean         @default(true) @map("is_available")
-  prepTimeMins Int?            @map("prep_time_mins")
+  price        Decimal  @map("price") @db.Decimal(10, 2)
+  imageUrl     String?  @map("image_url")
+  isAvailable  Boolean  @default(true) @map("is_available")
+  prepTimeMins Int?     @map("prep_time_mins")
   // Per-order quantity limits (hawker rules like "min 3 satay sticks").
   // null = no limit on that side.
-  minOrderQty  Int?            @map("min_order_qty")
-  maxOrderQty  Int?            @map("max_order_qty")
-  sortOrder    Int             @default(0) @map("sort_order")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  minOrderQty  Int?     @map("min_order_qty")
+  maxOrderQty  Int?     @map("max_order_qty")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
   category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -108,31 +113,34 @@ model MenuItem {
 }
 
 model Order {
-  id               String    @id @default(uuid())
-  storeId          String    @map("store_id")
-  customerPhone    String    @map("customer_phone")
-  customerName     String    @map("customer_name")
-  queueNumber      Int?      @map("queue_number")
-  status           String    @default("PENDING_PAYMENT")
-  subtotal         Decimal   @db.Decimal(10, 2)
-  tax              Decimal   @default(0) @db.Decimal(10, 2)
-  total            Decimal   @db.Decimal(10, 2)
-  estimatedWaitMins Int?     @map("estimated_wait_mins")
-  paymentIntentId  String?   @map("payment_intent_id")
-  paymentGateway   String?   @map("payment_gateway")
-  paymentStatus    String    @default("PENDING") @map("payment_status")
-  paymentMethod    String    @default("QR") @map("payment_method")
-  paymentProofUrl  String?   @map("payment_proof_url")
-  confirmedAt      DateTime? @map("confirmed_at")
-  chargeBreakdown  Json?     @map("charge_breakdown")
-  notes            String?
-  paidAt           DateTime? @map("paid_at")
-  acceptedAt       DateTime? @map("accepted_at")
-  preparingAt      DateTime? @map("preparing_at")
-  readyAt          DateTime? @map("ready_at")
-  completedAt      DateTime? @map("completed_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(uuid())
+  storeId           String    @map("store_id")
+  customerPhone     String    @map("customer_phone")
+  customerName      String    @map("customer_name")
+  queueNumber       Int?      @map("queue_number")
+  status            String    @default("PENDING_PAYMENT")
+  subtotal          Decimal   @db.Decimal(10, 2)
+  tax               Decimal   @default(0) @db.Decimal(10, 2)
+  total             Decimal   @db.Decimal(10, 2)
+  estimatedWaitMins Int?      @map("estimated_wait_mins")
+  estimatedReadyAt  DateTime? @map("estimated_ready_at")
+  etaAdjustMins     Int       @default(0) @map("eta_adjust_mins")
+  delayReason       String?   @map("delay_reason")
+  paymentIntentId   String?   @map("payment_intent_id")
+  paymentGateway    String?   @map("payment_gateway")
+  paymentStatus     String    @default("PENDING") @map("payment_status")
+  paymentMethod     String    @default("QR") @map("payment_method")
+  paymentProofUrl   String?   @map("payment_proof_url")
+  confirmedAt       DateTime? @map("confirmed_at")
+  chargeBreakdown   Json?     @map("charge_breakdown")
+  notes             String?
+  paidAt            DateTime? @map("paid_at")
+  acceptedAt        DateTime? @map("accepted_at")
+  preparingAt       DateTime? @map("preparing_at")
+  readyAt           DateTime? @map("ready_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   store         Store          @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
@@ -192,12 +200,12 @@ model DailyQueueCounter {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  actorId   String   @map("actor_id")
-  action    String
-  targetType String  @map("target_type")
-  targetId  String   @map("target_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  actorId    String   @map("actor_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([actorId])
   @@index([targetType, targetId])

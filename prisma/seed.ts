@@ -41,6 +41,7 @@ async function main() {
       passwordHash: await bcrypt.hash("merchant123", 12),
       role: "MERCHANT",
       isVerified: true,
+      trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
   console.log(`  ✅ Merchant: ${merchant.email}`);
