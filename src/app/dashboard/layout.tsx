@@ -32,12 +32,17 @@ export default async function DashboardLayout({
       where: { id: session.user.id },
       select: { isVerified: true, stores: { select: { status: true } } },
     });
-    if (user && !user.isVerified) {
+    // No row behind a live JWT means the account was purged after suspension —
+    // send it back to login rather than rendering a shell with no owner.
+    if (!user) {
+      redirect("/login");
+    }
+    if (!user.isVerified) {
       return <PendingApproval />;
     }
     // Suspension locks the merchant out immediately — the store is already
     // hidden from customers and the account is queued for deletion.
-    if (user?.stores.some((store) => store.status === "SUSPENDED")) {
+    if (user.stores.some((store) => store.status === "SUSPENDED")) {
       return <SuspendedNotice />;
     }
   }
