@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   ChevronRight,
   RefreshCw,
-  ShoppingBag
+  ShoppingBag,
+  Lock
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
@@ -63,12 +64,14 @@ export default function AnalyticsPage() {
   const [range, setRange] = useState<RangeKey>("today");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [frozen, setFrozen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       setRefreshing(true);
       const res = await fetch(`/api/dashboard/analytics?range=${range}`);
       const json = await res.json();
+      setFrozen(json.code === "FROZEN");
       if (json.success) setData(json.data);
     } catch (err) {
       console.error("Failed to fetch analytics", err);
@@ -98,6 +101,23 @@ export default function AnalyticsPage() {
         >
           <RefreshCw className="h-8 w-8 text-[var(--color-primary)] opacity-40" />
         </motion.div>
+      </div>
+    );
+  }
+
+  if (frozen) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="glass max-w-sm rounded-3xl p-10 text-center space-y-3">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15">
+            <Lock className="h-7 w-7 text-amber-500" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight">Analytics is available on a paid plan</h1>
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+            Your trial has ended, so reporting is paused while you&apos;re on limited
+            mode. Contact us to activate your plan and get your insights back.
+          </p>
+        </div>
       </div>
     );
   }

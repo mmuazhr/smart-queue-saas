@@ -4,12 +4,16 @@
 // Dashboard Layout — Sidebar navigation shell for merchants
 // =============================================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { AlertTriangle, Lock } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import TrialProfile from "@/components/dashboard/TrialProfile";
+
+// Analytics is the one paid-plan feature, so freezing locks this entry.
+const ANALYTICS_HREF = "/dashboard/analytics";
 
 const navItems = [
   {
@@ -77,6 +81,16 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [frozen, setFrozen] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/account")
+      .then((r) => r.json())
+      .then((res) => setFrozen(Boolean(res?.success && res.data?.frozenAt)))
+      .catch(() => {
+        // The lock is only a hint — the analytics API enforces it regardless.
+      });
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -102,6 +116,21 @@ export default function DashboardShell({
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            if (frozen && item.href === ANALYTICS_HREF) {
+              return (
+                <div
+                  key={item.href}
+                  aria-disabled="true"
+                  title="Analytics is available on a paid plan"
+                  className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium opacity-50"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {item.icon}
+                  {item.label}
+                  <Lock className="ml-auto h-3.5 w-3.5" />
+                </div>
+              );
+            }
             return (
               <Link
                 key={item.href}
@@ -186,6 +215,20 @@ export default function DashboardShell({
             <nav className="px-3 py-4 space-y-1">
               {navItems.map((item) => {
                 const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                if (frozen && item.href === ANALYTICS_HREF) {
+                  return (
+                    <div
+                      key={item.href}
+                      aria-disabled="true"
+                      className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium opacity-50"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      {item.icon}
+                      {item.label}
+                      <Lock className="ml-auto h-3.5 w-3.5" />
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     key={item.href}
@@ -223,6 +266,19 @@ export default function DashboardShell({
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t glass py-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          if (frozen && item.href === ANALYTICS_HREF) {
+            return (
+              <div
+                key={item.href}
+                aria-disabled="true"
+                className="flex flex-col items-center gap-0.5 px-3 py-1 text-xs opacity-50"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <Lock className="h-5 w-5" />
+                <span>{item.label}</span>
+              </div>
+            );
+          }
           return (
             <Link
               key={item.href}
@@ -239,7 +295,17 @@ export default function DashboardShell({
 
       {/* ---- Main Content ---- */}
       <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 pb-20 lg:pb-0">
-        <div className="p-4 lg:p-8">{children}</div>
+        <div className="p-4 lg:p-8">
+          {frozen && (
+            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+              <p className="text-sm font-medium text-amber-500">
+                Your trial has ended — you&apos;re on limited mode. Contact us to activate your plan.
+              </p>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

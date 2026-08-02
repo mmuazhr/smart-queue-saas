@@ -35,7 +35,10 @@ export default async function StorePage({ params }: Props) {
   // (defense in depth: categories are already storeId-scoped, but this
   // ensures a future regression in category ownership can't leak another
   // store's items onto this public storefront).
-  const storeRef = await prisma.store.findUnique({ where: { slug }, select: { id: true } });
+  const storeRef = await prisma.store.findUnique({
+    where: { slug },
+    select: { id: true, owner: { select: { frozenAt: true } } },
+  });
 
   if (!storeRef) {
     notFound();
@@ -58,7 +61,6 @@ export default async function StorePage({ params }: Props) {
         where: { categoryId: null, isAvailable: true },
         orderBy: { sortOrder: "asc" },
       },
-      owner: { select: { frozenAt: true } },
     },
   });
 
@@ -87,13 +89,11 @@ export default async function StorePage({ params }: Props) {
   // toPlainOrder/toPlainOrderItem already do for orders.
   // Limited free mode: the storefront stays live but only one item can be
   // ordered. The id is resolved here and enforced again in POST /api/orders.
-  const allowedMenuItemId = store.owner.frozenAt
-    ? await firstAvailableMenuItemId(store.id)
-    : null;
+  const frozen = storeRef.owner.frozenAt !== null;
+  const allowedMenuItemId = frozen ? await firstAvailableMenuItemId(store.id) : null;
 
-  const { owner: _owner, ...storeFields } = store;
   const plainStore = {
-    ...storeFields,
+    ...store,
     categories: store.categories.map((category) => ({
       ...category,
       menuItems: category.menuItems.map(toPlainMenuItem),
@@ -107,7 +107,7 @@ export default async function StorePage({ params }: Props) {
       isOpen={isOpen}
       closedLabel={closedLabel}
       ordersPaused={store.ordersPaused}
-      frozen={store.owner.frozenAt !== null}
+      frozen={frozen}
       allowedMenuItemId={allowedMenuItemId}
     />
   );

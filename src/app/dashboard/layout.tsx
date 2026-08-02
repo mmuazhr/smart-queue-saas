@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import DashboardShell from "./DashboardShell";
 import PendingApproval from "./PendingApproval";
+import SuspendedNotice from "./SuspendedNotice";
 
 export default async function DashboardLayout({
   children,
@@ -29,10 +30,15 @@ export default async function DashboardLayout({
   if (role === "MERCHANT") {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { isVerified: true },
+      select: { isVerified: true, stores: { select: { status: true } } },
     });
     if (user && !user.isVerified) {
       return <PendingApproval />;
+    }
+    // Suspension locks the merchant out immediately — the store is already
+    // hidden from customers and the account is queued for deletion.
+    if (user?.stores.some((store) => store.status === "SUSPENDED")) {
+      return <SuspendedNotice />;
     }
   }
   return <DashboardShell>{children}</DashboardShell>;

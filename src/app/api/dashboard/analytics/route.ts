@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       // Verify ownership (ADMIN may query any store)
       store = await prisma.store.findUnique({
         where: { id: requestedStoreId },
-        select: { id: true, ownerId: true },
+        select: { id: true, ownerId: true, owner: { select: { frozenAt: true } } },
       });
       if (!store) {
         return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
@@ -82,10 +82,22 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Default: first store owned by this merchant
-      store = await prisma.store.findFirst({ where: { ownerId: session.user.id } });
+      store = await prisma.store.findFirst({
+        where: { ownerId: session.user.id },
+        select: { id: true, ownerId: true, owner: { select: { frozenAt: true } } },
+      });
       if (!store) {
         return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
       }
+    }
+
+    // Analytics is a paid-plan feature: a frozen merchant keeps selling but
+    // loses the reporting until the plan is activated.
+    if (store.owner.frozenAt) {
+      return NextResponse.json(
+        { success: false, code: "FROZEN", error: "Analytics is available on a paid plan" },
+        { status: 403 }
+      );
     }
 
     const analyticsWindow = resolveAnalyticsWindow(parseAnalyticsRange(searchParams.get("range")));
