@@ -28,9 +28,9 @@ export async function GET(
   try {
     const store = await prisma.store.findUnique({
       where: { slug },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    if (!store) {
+    if (!store || (store.status !== "ACTIVE" && store.status !== "CLOSED")) {
       return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
     }
 
