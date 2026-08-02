@@ -97,23 +97,52 @@ describe("projectReadyAt", () => {
   const stats = { throughputPerMin: 0.5, avgPrepMins: 10, samples: 5 };
 
   it("projects from preparingAt for orders already cooking", () => {
-    const order = { status: "PREPARING", preparingAt: minsAgo(4), etaAdjustMins: 0 };
+    const order = { status: "PREPARING", preparingAt: minsAgo(4), confirmedAt: NOW, etaAdjustMins: 0 };
     const projected = projectReadyAt(order, 0, stats, 10, 5, NOW);
     // started 4 min ago + 10 min avg prep = 6 min from now
     expect(projected.getTime()).toBe(minsAhead(6).getTime());
   });
 
   it("never projects a cooking order earlier than one minute from now", () => {
-    const order = { status: "PREPARING", preparingAt: minsAgo(30), etaAdjustMins: 0 };
+    const order = { status: "PREPARING", preparingAt: minsAgo(30), confirmedAt: NOW, etaAdjustMins: 0 };
     const projected = projectReadyAt(order, 0, stats, 10, 5, NOW);
     expect(projected.getTime()).toBe(minsAhead(1).getTime());
   });
 
-  it("projects queued orders through the full estimate", () => {
-    const order = { status: "PAID", preparingAt: null, etaAdjustMins: 0 };
+  it("projects queued orders through the full estimate, anchored to confirmedAt", () => {
+    const order = { status: "PAID", preparingAt: null, confirmedAt: NOW, etaAdjustMins: 0 };
     const projected = projectReadyAt(order, 2, stats, 10, 5, NOW);
-    // 2 ÷ 0.5 = 4 clearance + 10 prep = 14 min
+    // 2 ÷ 0.5 = 4 clearance + 10 prep = 14 min from confirmation (= now here)
     expect(projected.getTime()).toBe(minsAhead(14).getTime());
+  });
+
+  it("anchors the queued projection to confirmedAt, not to the current poll time", () => {
+    const order = { status: "PAID", preparingAt: null, confirmedAt: minsAgo(5), etaAdjustMins: 0 };
+    const projected = projectReadyAt(order, 2, stats, 10, 5, NOW);
+    // Same 14-minute estimate, but anchored 5 min in the past — so only 9 min from now.
+    expect(projected.getTime()).toBe(order.confirmedAt.getTime() + 14 * 60_000);
+    expect(projected.getTime()).toBe(minsAhead(9).getTime());
+  });
+
+  it("falls back to anchoring on now when confirmedAt is null", () => {
+    const order = { status: "PAID", preparingAt: null, confirmedAt: null, etaAdjustMins: 0 };
+    const projected = projectReadyAt(order, 2, stats, 10, 5, NOW);
+    expect(projected.getTime()).toBe(minsAhead(14).getTime());
+  });
+});
+
+describe("projectReadyAt regression: queued ETA does not ratchet with wall-clock", () => {
+  it("never triggers a revision across a 30-minute window while queue state is unchanged", () => {
+    const T0 = new Date("2026-08-02T12:00:00Z");
+    const stats = { throughputPerMin: null, avgPrepMins: 10, samples: 5 };
+    const order = { status: "PAID", preparingAt: null, confirmedAt: T0, etaAdjustMins: 0 };
+    const promisedReadyAt = new Date(T0.getTime() + 10 * 60_000); // 10-min promise stamped at confirmation
+
+    for (let stepMs = 0; stepMs <= 30 * 60_000; stepMs += 30_000) {
+      const now = new Date(T0.getTime() + stepMs);
+      const projected = projectReadyAt(order, 0, stats, 10, 5, now);
+      expect(shouldRevise(promisedReadyAt, projected, 10)).toBe(false);
+    }
   });
 });
 

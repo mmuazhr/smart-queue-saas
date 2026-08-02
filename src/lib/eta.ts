@@ -65,7 +65,12 @@ export function computeEtaMins(inputs: EtaInputs): number {
 }
 
 export function projectReadyAt(
-  order: { status: string; preparingAt: Date | null; etaAdjustMins: number },
+  order: {
+    status: string;
+    preparingAt: Date | null;
+    confirmedAt: Date | null;
+    etaAdjustMins: number;
+  },
   ordersAhead: number,
   stats: StoreEtaStats,
   fallbackPrepMins: number,
@@ -85,7 +90,12 @@ export function projectReadyAt(
     maxConcurrentOrders,
     etaAdjustMins: order.etaAdjustMins,
   });
-  return new Date(now.getTime() + mins * 60_000);
+  // Anchored to the confirmation instant, not `now`: `now` moves on every
+  // poll while the order sits queued, which would ratchet the projection
+  // (and the promise it's compared against in shouldRevise) forward on
+  // wall-clock alone with no change in queue state.
+  const base = order.confirmedAt ?? now;
+  return new Date(base.getTime() + mins * 60_000);
 }
 
 /**
