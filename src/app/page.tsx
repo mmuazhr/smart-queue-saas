@@ -424,8 +424,8 @@ export default function HomePage() {
               <div className="rounded-2xl bg-amber-400 p-8 md:p-10 space-y-8 text-amber-950">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="text-2xl font-bold text-amber-800 line-through">RM69</span>
-                    <span className="text-6xl font-extrabold tracking-tight text-amber-950">RM59</span>
+                    <span className="text-2xl font-bold text-amber-800 line-through">RM49</span>
+                    <span className="text-6xl font-extrabold tracking-tight text-amber-950">RM39</span>
                   </div>
                   <p className="text-base text-amber-900">
                     /month · for your first 6 months
