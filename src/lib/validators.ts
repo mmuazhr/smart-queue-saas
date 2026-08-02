@@ -192,6 +192,16 @@ export const updateOrderStatusSchema = z.object({
     .optional(),
 });
 
+export const orderEtaBumpSchema = z.object({
+  addMins: z.number().int().min(1).max(120),
+  reason: z.string().trim().max(140).optional(),
+});
+
+export const storeQueueDelaySchema = z.object({
+  delayMins: z.number().int().min(0).max(180),
+  reason: z.string().trim().max(140).optional(),
+});
+
 // ---- Auth Schemas ----
 
 export const loginSchema = z.object({
@@ -251,6 +261,8 @@ export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type CreateOrderItemInput = z.infer<typeof createOrderItemSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type OrderEtaBumpInput = z.infer<typeof orderEtaBumpSchema>;
+export type StoreQueueDelayInput = z.infer<typeof storeQueueDelaySchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
