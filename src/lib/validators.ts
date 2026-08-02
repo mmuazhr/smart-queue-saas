@@ -260,8 +260,9 @@ export const adminMerchantTrialSchema = z
   .object({
     approve: z.literal(true).optional(),
     earlyBird: z.boolean().optional(),
+    freeze: z.boolean().optional(),
   })
-  .refine((v) => v.approve !== undefined || v.earlyBird !== undefined, {
+  .refine((v) => v.approve !== undefined || v.earlyBird !== undefined || v.freeze !== undefined, {
     message: "Nothing to update",
   });
 

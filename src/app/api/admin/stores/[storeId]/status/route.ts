@@ -40,10 +40,15 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
   }
 
+  // suspendedAt starts the 7-day purge clock the merchants listing sweeps on;
+  // reactivating clears it so a restored store is never collected.
   const store = await prisma.store.update({
     where: { id: storeId },
-    data: { status: parsed.data.status },
-    select: { id: true, status: true },
+    data: {
+      status: parsed.data.status,
+      suspendedAt: parsed.data.status === "SUSPENDED" ? new Date() : null,
+    },
+    select: { id: true, status: true, suspendedAt: true },
   });
 
   await prisma.auditLog.create({

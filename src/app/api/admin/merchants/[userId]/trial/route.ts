@@ -54,8 +54,11 @@ export async function PATCH(
           }
         : {}),
       ...(parsed.data.earlyBird !== undefined ? { earlyBird: parsed.data.earlyBird } : {}),
+      ...(parsed.data.freeze !== undefined
+        ? { frozenAt: parsed.data.freeze ? new Date() : null }
+        : {}),
     },
-    select: { id: true, isVerified: true, trialEndsAt: true, earlyBird: true },
+    select: { id: true, isVerified: true, trialEndsAt: true, earlyBird: true, frozenAt: true },
   });
 
   if (approving) {
@@ -73,6 +76,16 @@ export async function PATCH(
       data: {
         actorId: gate.user.id,
         action: "ADMIN_MERCHANT_EARLYBIRD",
+        targetType: "user",
+        targetId: userId,
+      },
+    });
+  }
+  if (parsed.data.freeze !== undefined) {
+    await prisma.auditLog.create({
+      data: {
+        actorId: gate.user.id,
+        action: parsed.data.freeze ? "ADMIN_MERCHANT_FREEZE" : "ADMIN_MERCHANT_UNFREEZE",
         targetType: "user",
         targetId: userId,
       },

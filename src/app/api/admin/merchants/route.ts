@@ -7,6 +7,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { PURGE_AFTER_DAYS } from "@/lib/trial";
+import { logger } from "@/lib/logger";
 
 async function requireAdmin() {
   const session = await auth();
@@ -15,11 +17,59 @@ async function requireAdmin() {
   return session;
 }
 
+/**
+ * Permanently deletes merchants whose store has been suspended for longer than
+ * the purge window. Runs on every admin listing load so no cron is needed; a
+ * failure is logged and skipped rather than breaking the page. The role filter
+ * keeps this — the only irreversible operation in the admin area — away from
+ * any non-merchant account that happens to own a store.
+ */
+async function sweepPurgedMerchants(actorId: string) {
+  const cutoff = new Date(Date.now() - PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+  try {
+    const expired = await prisma.store.findMany({
+      where: { status: "SUSPENDED", suspendedAt: { lt: cutoff }, owner: { role: "MERCHANT" } },
+      select: { id: true, ownerId: true },
+    });
+
+    for (const store of expired) {
+      try {
+        // Foreign keys are not all cascading, so children go first in
+        // dependency order and the whole merchant lands in one transaction.
+        await prisma.$transaction([
+          prisma.notification.deleteMany({ where: { order: { storeId: store.id } } }),
+          prisma.orderItem.deleteMany({ where: { order: { storeId: store.id } } }),
+          prisma.order.deleteMany({ where: { storeId: store.id } }),
+          prisma.menuItem.deleteMany({ where: { storeId: store.id } }),
+          prisma.category.deleteMany({ where: { storeId: store.id } }),
+          prisma.dailyQueueCounter.deleteMany({ where: { storeId: store.id } }),
+          prisma.store.delete({ where: { id: store.id } }),
+          prisma.user.delete({ where: { id: store.ownerId } }),
+          prisma.auditLog.create({
+            data: {
+              actorId,
+              action: "ADMIN_MERCHANT_PURGE",
+              targetType: "user",
+              targetId: store.ownerId,
+            },
+          }),
+        ]);
+      } catch (error) {
+        logger.error("Merchant purge failed:", error);
+      }
+    }
+  } catch (error) {
+    logger.error("Merchant purge sweep failed:", error);
+  }
+}
+
 // GET /api/admin/merchants
 export async function GET() {
   const gate = await requireAdmin();
   if (gate === null) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   if (gate === "forbidden") return NextResponse.json({ success: false, code: "FORBIDDEN", error: "Admin only" }, { status: 403 });
+
+  await sweepPurgedMerchants(gate.user.id);
 
   const users = await prisma.user.findMany({
     where: { role: "MERCHANT" },
@@ -33,7 +83,10 @@ export async function GET() {
       isVerified: true,
       trialEndsAt: true,
       earlyBird: true,
-      stores: { select: { id: true, name: true, slug: true, status: true, createdAt: true } },
+      frozenAt: true,
+      stores: {
+        select: { id: true, name: true, slug: true, status: true, suspendedAt: true, createdAt: true },
+      },
     },
   });
 
@@ -59,6 +112,7 @@ export async function GET() {
         isVerified: u.isVerified,
         trialEndsAt: u.trialEndsAt,
         earlyBird: u.earlyBird,
+        frozenAt: u.frozenAt,
         createdAt: u.createdAt,
         store: store ? { ...store, orderCount, gmv } : null,
       };
