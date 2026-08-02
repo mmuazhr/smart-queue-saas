@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import TrialProfile from "@/components/dashboard/TrialProfile";
 
 const navItems = [
   {
@@ -124,6 +125,7 @@ export default function DashboardShell({
 
         {/* Footer */}
         <div className="p-4 border-t space-y-3" style={{ borderColor: "var(--color-border)" }}>
+          <TrialProfile />
           <div className="flex items-center justify-between px-2">
             <span className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-widest">Theme</span>
             <ThemeToggle />
