@@ -80,6 +80,16 @@ export default function MenuCard({
             <button disabled className="w-full py-2 rounded-xl bg-zinc-800 text-zinc-500 text-xs font-bold uppercase">
               Unavailable
             </button>
+          ) : !canOrder ? (
+            // Ahead of the stepper on purpose: an item already in the cart that
+            // the store can no longer sell must say so, not show dead controls.
+            <button
+              disabled
+              aria-disabled="true"
+              className="w-full py-2.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] text-xs font-bold uppercase tracking-wider"
+            >
+              {unavailableLabel}
+            </button>
           ) : count > 0 ? (
             <div className="flex items-center justify-between w-full bg-[var(--color-bg-tertiary)] rounded-xl px-1 py-1">
               <button
@@ -102,16 +112,8 @@ export default function MenuCard({
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-          ) : !canOrder ? (
-            <button
-              disabled
-              aria-disabled="true"
-              className="w-full py-2.5 rounded-xl bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] text-xs font-bold uppercase tracking-wider"
-            >
-              {unavailableLabel}
-            </button>
           ) : (
-            <button 
+            <button
               onClick={() => addItem({
                 menuItemId: item.id,
                 name: item.name,
