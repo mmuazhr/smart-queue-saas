@@ -8,7 +8,7 @@
 New `User.frozenAt DateTime?`. Storefront STAYS LIVE but degraded:
 
 - **Menu limit 1:** only the merchant's FIRST available menu item is orderable on the public store page; every other item renders as unavailable with label "Unavailable at the moment". Server-enforced at order creation too: an order containing any item other than the allowed one is rejected.
-- **Order cap 5 ACTIVE at a time:** when the store already has 5 orders in statuses AWAITING_CONFIRMATION/PAID/ACCEPTED/PREPARING/READY, new checkout is rejected with a friendly "store is at capacity — please try again shortly" (code `FROZEN_CAPACITY`). Capacity frees as orders complete/cancel.
+- **Order cap 5 ACTIVE at a time:** when the store already has 5 orders in statuses PAID/ACCEPTED/PREPARING/READY (confirmed kitchen work only — unconfirmed orders are excluded so throwaway checkouts can't jam the store; review finding H1), new checkout is rejected with a friendly "store is at capacity — please try again shortly" (code `FROZEN_CAPACITY`). Capacity frees as orders complete/cancel.
 - **Analytics disabled:** `/api/dashboard/analytics` returns 403 (code `FROZEN`) and the Analytics nav item is greyed/locked with a lock hint; the page shows "Analytics is available on a paid plan".
 - Merchant dashboard shows a persistent amber banner: "Your trial has ended — you're on limited mode. Contact us to activate your plan."
 - Freeze/Unfreeze is instant and reversible; audit-logged (`ADMIN_MERCHANT_FREEZE` / `ADMIN_MERCHANT_UNFREEZE`).
