@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { updateOrderStatusSchema } from "@/lib/validators";
 import { assignQueueNumber } from "@/lib/queue";
+import { estimateForNewOrder } from "@/lib/eta-service";
 import { NotificationService } from "@/lib/notifications/service";
 import { toPlainOrder } from "@/lib/serializers";
 import { logger } from "@/lib/logger";
@@ -119,11 +120,21 @@ async function confirmOrder(orderId: string, storeId: string, paymentMethod: str
   const queueNumber = await assignQueueNumber(storeId);
   const now = new Date();
 
+  // The customer's promise, made once at confirmation. estimateForNewOrder
+  // returns null on failure — a missing estimate must never block a confirm.
+  const etaMins = await estimateForNewOrder(storeId);
+
   // Hoisted so the degraded response below can echo exactly what was committed.
   const confirmed = {
     status: "PAID",
     queueNumber,
     confirmedAt: now,
+    ...(etaMins != null
+      ? {
+          estimatedWaitMins: etaMins,
+          estimatedReadyAt: new Date(now.getTime() + etaMins * 60_000),
+        }
+      : {}),
     ...(paymentMethod === "CASH" ? {} : { paymentStatus: "PAID", paidAt: now }),
   };
 
