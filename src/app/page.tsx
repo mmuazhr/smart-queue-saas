@@ -18,6 +18,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 const CTA_LABEL = "Start Free Trial";
+const TRIAL_MODE = process.env.NEXT_PUBLIC_TRIAL_MODE === "true";
 
 const marqueeItems = [
   "QR Ordering",
@@ -422,21 +423,35 @@ export default function HomePage() {
               {/* The page's one bright card. `.glass` is unlayered CSS and would
                   win over any Tailwind background, so it is dropped, not overridden. */}
               <div className="rounded-2xl bg-amber-400 p-8 md:p-10 space-y-8 text-amber-950">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="text-2xl font-bold text-amber-800 line-through">RM49</span>
-                    <span className="text-6xl font-extrabold tracking-tight text-amber-950">RM39</span>
+                {TRIAL_MODE ? (
+                  <div className="space-y-3">
+                    <span className="text-4xl font-extrabold tracking-tight text-amber-950">
+                      Closed beta
+                    </span>
+                    <p className="text-base text-amber-900">
+                      Free 7-day trial · invite only, no credit card needed.
+                    </p>
+                    <p className="inline-flex rounded-full bg-amber-950/10 px-3 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-950">
+                      First 5 merchants get RM10/month off for 6 months
+                    </p>
                   </div>
-                  <p className="text-base text-amber-900">
-                    /month · for your first 6 months
-                  </p>
-                  <p className="text-base text-amber-900">
-                    Free 7-day trial, no credit card needed.
-                  </p>
-                  <p className="inline-flex rounded-full bg-amber-950/10 px-3 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-950">
-                    Launch offer · 5 of 5 spots open
-                  </p>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-baseline gap-3">
+                      <span className="text-2xl font-bold text-amber-800 line-through">RM49</span>
+                      <span className="text-6xl font-extrabold tracking-tight text-amber-950">RM39</span>
+                    </div>
+                    <p className="text-base text-amber-900">
+                      /month · for your first 6 months
+                    </p>
+                    <p className="text-base text-amber-900">
+                      Free 7-day trial, no credit card needed.
+                    </p>
+                    <p className="inline-flex rounded-full bg-amber-950/10 px-3 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-950">
+                      Launch offer · 5 of 5 spots open
+                    </p>
+                  </div>
+                )}
 
                 <ul className="space-y-3">
                   {inclusions.map((item) => (
