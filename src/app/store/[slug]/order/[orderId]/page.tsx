@@ -24,6 +24,9 @@ interface Order {
   status: string;
   queueNumber: number | null;
   estimatedWaitMins: number | null;
+  etaMinutes?: number | null;
+  delayed?: boolean;
+  delayReason?: string | null;
   subtotal: number;
   tax: number;
   total: number;
@@ -98,7 +101,10 @@ export default function OrderTrackingPage() {
 
   useEffect(() => {
     if (streamData && (streamData as { type: string }).type === "ORDER_UPDATE") {
-      const update = streamData as { status: string; queueNumber: number; estimatedWaitMins: number; paymentStatus: string };
+      const update = streamData as {
+        status: string; queueNumber: number; estimatedWaitMins: number; paymentStatus: string;
+        etaMinutes: number | null; delayed: boolean; delayReason: string | null;
+      };
       setOrder((prev) =>
         prev
           ? {
@@ -107,6 +113,9 @@ export default function OrderTrackingPage() {
               queueNumber: update.queueNumber,
               estimatedWaitMins: update.estimatedWaitMins,
               paymentStatus: update.paymentStatus,
+              etaMinutes: update.etaMinutes,
+              delayed: update.delayed,
+              delayReason: update.delayReason,
             }
           : null
       );
@@ -175,6 +184,21 @@ export default function OrderTrackingPage() {
           </div>
         )}
 
+        {/* Friendly delay notice — appears once the promise has been revised */}
+        {order.delayed && !isCancelled && !isCompleted && order.status !== "READY" && (
+          <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-start gap-4 animate-fade-in">
+            <Clock className="h-8 w-8 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-amber-500">Sorry for the wait! 🙏</p>
+              <p className="text-sm text-amber-500/80 mt-1">
+                The kitchen&apos;s a little busy — your order should now be ready in about{" "}
+                <span className="font-bold">{formatWaitTime(order.etaMinutes ?? 0)}</span>.
+                {order.delayReason ? ` (${order.delayReason})` : ""}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Queue number, or the payment panel while awaiting merchant confirmation */}
         {isAwaitingConfirmation ? (
           <section className="space-y-4">
@@ -200,8 +224,10 @@ export default function OrderTrackingPage() {
               </p>
               {!isCancelled && !isCompleted && order.status !== "READY" && (
                 <p className="text-xs text-[var(--color-text-muted)] flex items-center justify-center gap-1.5">
-                  <Clock className="h-3 w-3" /> Estimated Wait:{" "}
-                  <span className="text-[var(--color-primary)] font-bold">{formatWaitTime(order.estimatedWaitMins || 0)}</span>
+                  <Clock className="h-3 w-3" /> Ready in about{" "}
+                  <span className="text-[var(--color-primary)] font-bold">
+                    {formatWaitTime(order.etaMinutes ?? order.estimatedWaitMins ?? 0)}
+                  </span>
                 </p>
               )}
             </div>
