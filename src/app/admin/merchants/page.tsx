@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { daysUntilPurge, PURGE_AFTER_DAYS } from "@/lib/trial";
 
 interface MerchantRow {
   userId: string;
@@ -17,12 +18,14 @@ interface MerchantRow {
   isVerified: boolean;
   trialEndsAt: string | null;
   earlyBird: boolean;
+  frozenAt: string | null;
   createdAt: string;
   store: {
     id: string;
     name: string;
     slug: string;
     status: string;
+    suspendedAt: string | null;
     createdAt: string;
     orderCount: number;
     gmv: number;
@@ -60,7 +63,9 @@ export default function AdminMerchantsPage() {
     const nextStatus = store.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
     if (
       nextStatus === "SUSPENDED" &&
-      !window.confirm(`Suspend ${store.name}? Customers will not be able to order.`)
+      !window.confirm(
+        `Suspend ${store.name}? The storefront goes offline, the merchant is locked out, and the account is permanently deleted after ${PURGE_AFTER_DAYS} days.`
+      )
     ) {
       return;
     }
@@ -81,7 +86,10 @@ export default function AdminMerchantsPage() {
     }
   };
 
-  const patchTrial = async (userId: string, body: { approve?: true; earlyBird?: boolean }) => {
+  const patchTrial = async (
+    userId: string,
+    body: { approve?: true; earlyBird?: boolean; freeze?: boolean }
+  ) => {
     try {
       setPendingUserId(userId);
       const res = await fetch(`/api/admin/merchants/${userId}/trial`, {
@@ -224,31 +232,51 @@ export default function AdminMerchantsPage() {
                     <button
                       onClick={() => patchTrial(m.userId, { earlyBird: !m.earlyBird })}
                       disabled={pendingUserId === m.userId}
-                      className="mr-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50"
-                      style={{
-                        borderColor: m.earlyBird ? "var(--color-primary)" : "var(--color-border)",
-                        color: m.earlyBird ? "var(--color-primary)" : "var(--color-text-secondary)",
-                      }}
+                      className={`mr-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+                        m.earlyBird ? "border-green-500 bg-green-500 text-white" : ""
+                      }`}
+                      style={
+                        m.earlyBird
+                          ? undefined
+                          : { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }
+                      }
                     >
                       {m.earlyBird ? "Early bird ✓" : "Early bird"}
                     </button>
+                    <button
+                      onClick={() => patchTrial(m.userId, { freeze: !m.frozenAt })}
+                      disabled={pendingUserId === m.userId}
+                      className={`mr-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+                        m.frozenAt ? "border-amber-500 bg-amber-500 text-white" : ""
+                      }`}
+                      style={
+                        m.frozenAt
+                          ? undefined
+                          : { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }
+                      }
+                    >
+                      {m.frozenAt ? "Unfreeze" : "Freeze"}
+                    </button>
                     {store && (
-                      <button
-                        onClick={() => updateStatus(store)}
-                        disabled={pendingStoreId === store.id}
-                        className="rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50"
-                        style={
-                          store.status === "ACTIVE"
-                            ? { borderColor: "var(--color-error)", color: "var(--color-error)" }
-                            : { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }
-                        }
-                      >
-                        {pendingStoreId === store.id
-                          ? "Saving…"
-                          : store.status === "ACTIVE"
-                            ? "Suspend"
-                            : "Reactivate"}
-                      </button>
+                      <span className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => updateStatus(store)}
+                          disabled={pendingStoreId === store.id}
+                          className="rounded-lg border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50"
+                          style={
+                            store.status === "ACTIVE"
+                              ? { borderColor: "var(--color-error)", color: "var(--color-error)" }
+                              : { borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }
+                          }
+                        >
+                          {pendingStoreId === store.id
+                            ? "Saving…"
+                            : store.status === "ACTIVE"
+                              ? "Suspend"
+                              : "Restore"}
+                        </button>
+                        <PurgeCountdown suspendedAt={store.suspendedAt} />
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -265,6 +293,16 @@ export default function AdminMerchantsPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+function PurgeCountdown({ suspendedAt }: { suspendedAt: string | null }) {
+  const daysLeft = daysUntilPurge(suspendedAt ? new Date(suspendedAt) : null, new Date());
+  if (daysLeft === null) return null;
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest bg-red-500/15 text-red-500">
+      deletes in {daysLeft}d
+    </span>
   );
 }
 
