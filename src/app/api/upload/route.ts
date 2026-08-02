@@ -10,7 +10,7 @@ import { uploadPublicAsset } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const KINDS = new Set(["qr", "menu", "logo"]);
+const KINDS = new Set(["qr", "menu", "logo", "avatar"]);
 
 export async function POST(request: NextRequest) {
   const session = await auth();

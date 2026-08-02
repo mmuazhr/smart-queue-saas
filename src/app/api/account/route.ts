@@ -15,7 +15,7 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, phone: true },
+    select: { id: true, name: true, email: true, phone: true, avatarUrl: true, trialEndsAt: true, earlyBird: true },
   });
   if (!user) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const { name, email, phone } = parsed.data;
+  const { name, email, phone, avatarUrl } = parsed.data;
 
   if (email) {
     const taken = await prisma.user.findFirst({
@@ -63,8 +63,9 @@ export async function PUT(request: NextRequest) {
       ...(name !== undefined ? { name } : {}),
       ...(email !== undefined ? { email } : {}),
       ...(phone !== undefined ? { phone } : {}), // null clears, string sets
+      ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     },
-    select: { id: true, name: true, email: true, phone: true },
+    select: { id: true, name: true, email: true, phone: true, avatarUrl: true },
   });
 
   return NextResponse.json({ success: true, data: user });

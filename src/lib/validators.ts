@@ -235,6 +235,7 @@ export const updateAccountSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100).optional(),
   email: z.string().email("Please enter a valid email").optional(),
   phone: clearablePhoneSchema,
+  avatarUrl: z.string().url().max(500).optional(),
 });
 
 export const changePasswordSchema = z.object({

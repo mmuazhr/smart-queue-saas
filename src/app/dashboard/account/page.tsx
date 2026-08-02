@@ -11,6 +11,8 @@ export default function AccountPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -31,6 +33,7 @@ export default function AccountPage() {
           setName(res.data.name ?? "");
           setEmail(res.data.email ?? "");
           setPhone(res.data.phone ?? "");
+          setAvatarUrl(res.data.avatarUrl ?? null);
         }
       })
       .finally(() => setLoading(false));
@@ -86,6 +89,33 @@ export default function AccountPage() {
     }
   }
 
+  async function uploadAvatar(file: File) {
+    if (uploadingAvatar) return;
+    setUploadingAvatar(true);
+    setProfileMsg(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", "avatar");
+      const up = await fetch("/api/upload", { method: "POST", body: form });
+      const upData = await up.json();
+      if (!upData.success) throw new Error(upData.error || "Upload failed");
+      const save = await fetch("/api/account", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: upData.data.url }),
+      });
+      const saveData = await save.json();
+      if (!saveData.success) throw new Error(saveData.error || "Save failed");
+      setAvatarUrl(upData.data.url);
+      setProfileMsg({ ok: true, text: "Profile photo updated." });
+    } catch {
+      setProfileMsg({ ok: false, text: "Could not update your photo — please try again." });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" /></div>;
 
   const inputCls = "w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none";
@@ -104,6 +134,28 @@ export default function AccountPage() {
 
       <form onSubmit={saveProfile} className="glass rounded-2xl p-6 space-y-4">
         <h2 className="font-bold">Profile</h2>
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 overflow-hidden rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center font-black text-lg text-[var(--color-text-muted)]">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profile photo" className="h-full w-full object-cover" />
+            ) : (
+              (name || "?").charAt(0).toUpperCase()
+            )}
+          </div>
+          <label className="cursor-pointer rounded-xl border px-4 py-2 text-xs font-bold transition-colors hover:bg-[var(--color-bg-tertiary)]" style={{ borderColor: "var(--color-border)" }}>
+            {uploadingAvatar ? "Uploading…" : "Change Photo"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
         <div className="space-y-1.5">
           <label htmlFor="acct-name" className={labelCls}>Full Name</label>
           <input id="acct-name" className={inputCls} value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
