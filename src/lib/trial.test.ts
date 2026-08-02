@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trialStatus, TRIAL_LENGTH_DAYS } from "./trial";
+import { daysUntilPurge, trialStatus, TRIAL_LENGTH_DAYS } from "./trial";
 
 const NOW = new Date("2026-08-02T12:00:00Z");
 const daysAhead = (d: number) => new Date(NOW.getTime() + d * 24 * 60 * 60 * 1000);
@@ -30,5 +30,23 @@ describe("trialStatus", () => {
   it("marks an expired trial as ended with zero left", () => {
     const s = trialStatus(daysAhead(-1), NOW)!;
     expect(s).toEqual({ daysLeft: 0, fraction: 0, tone: "red", ended: true });
+  });
+});
+
+describe("daysUntilPurge", () => {
+  it("returns null when the store is not suspended", () => {
+    expect(daysUntilPurge(null, NOW)).toBeNull();
+  });
+
+  it("gives a freshly suspended store the full 7 days", () => {
+    expect(daysUntilPurge(NOW, NOW)).toBe(7);
+  });
+
+  it("rounds a partial day up", () => {
+    expect(daysUntilPurge(daysAhead(-6.5), NOW)).toBe(1);
+  });
+
+  it("returns zero once the purge window has passed", () => {
+    expect(daysUntilPurge(daysAhead(-8), NOW)).toBe(0);
   });
 });

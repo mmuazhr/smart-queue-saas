@@ -3,6 +3,7 @@
 // =============================================================================
 
 export const TRIAL_LENGTH_DAYS = 7;
+export const PURGE_AFTER_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -11,6 +12,14 @@ export interface TrialStatus {
   fraction: number; // 1 = full ring, 0 = empty
   tone: "green" | "amber" | "red";
   ended: boolean;
+}
+
+/** Days left before a suspended store is permanently purged; null when not suspended. */
+export function daysUntilPurge(suspendedAt: Date | null, now: Date): number | null {
+  if (!suspendedAt) return null;
+  const msLeft = suspendedAt.getTime() + PURGE_AFTER_DAYS * DAY_MS - now.getTime();
+  if (msLeft <= 0) return 0;
+  return Math.ceil(msLeft / DAY_MS);
 }
 
 export function trialStatus(trialEndsAt: Date | null, now: Date): TrialStatus | null {
