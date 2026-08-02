@@ -1,0 +1,13 @@
+{
+  "detector": {
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/app/globals.css"],
+        "createdAt": "2026-08-02T01:30:00Z",
+        "reason": "Intentional: .hatch-top::before is the diagonal hatch texture strip on full-bleed anchor sections, adopted from the user-approved Behance reference (direction B). Not a card side-tab accent."
+      }
+    ]
+  }
+}
