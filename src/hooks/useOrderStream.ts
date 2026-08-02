@@ -11,6 +11,10 @@ export interface OrderStreamUpdate {
   status: string;
   paymentStatus: string;
   estimatedWaitMins: number | null;
+  estimatedReadyAt: string | null;
+  etaMinutes: number | null;
+  delayed: boolean;
+  delayReason: string | null;
   paidAt: string | null;
   acceptedAt: string | null;
   preparingAt: string | null;

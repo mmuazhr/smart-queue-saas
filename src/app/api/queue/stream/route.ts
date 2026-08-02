@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { toPlainOrder } from "@/lib/serializers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getStoreEtaContext } from "@/lib/eta-service";
+import { isDelayed, projectReadyAt, remainingMins, shouldRevise } from "@/lib/eta";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +25,15 @@ const MAX_STREAM_LIFETIME_MS = 15 * 60 * 1000;
 // Safe fields projected for the public single-order stream
 const ORDER_PUBLIC_FIELDS = {
   id: true,
+  storeId: true,
   queueNumber: true,
   status: true,
   paymentStatus: true,
   estimatedWaitMins: true,
+  estimatedReadyAt: true,
+  etaAdjustMins: true,
+  delayReason: true,
+  confirmedAt: true,
   paidAt: true,
   acceptedAt: true,
   preparingAt: true,
@@ -100,16 +107,71 @@ export async function GET(request: NextRequest) {
         try {
           if (orderId) {
             // Single-order stream: project only safe fields — no phone/name
-            const order = await prisma.order.findUnique({
+            let order = await prisma.order.findUnique({
               where: { id: orderId },
               select: ORDER_PUBLIC_FIELDS,
             });
 
             if (order) {
-              sendEvent({ type: "ORDER_UPDATE", ...order });
+              const active = ["PAID", "ACCEPTED", "PREPARING"].includes(order.status);
 
-              if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-                close();
+              // Lazy delay revision: when the measured pace has drifted past
+              // the promise, push the promise out (CAS on the old value so
+              // concurrent streams write it exactly once) and re-read.
+              if (active && order.estimatedReadyAt) {
+                try {
+                  const ctx = await getStoreEtaContext(order.storeId);
+                  if (ctx) {
+                    const now = new Date();
+                    const ordersAhead =
+                      order.queueNumber == null
+                        ? 0
+                        : await prisma.order.count({
+                            where: {
+                              storeId: order.storeId,
+                              queueNumber: { lt: order.queueNumber },
+                              status: { in: ["PAID", "ACCEPTED", "PREPARING"] },
+                            },
+                          });
+                    const projected = projectReadyAt(
+                      order,
+                      ordersAhead,
+                      ctx.stats,
+                      ctx.avgPrepTimeMins,
+                      ctx.maxConcurrentOrders,
+                      now
+                    );
+                    if (shouldRevise(order.estimatedReadyAt, projected, order.estimatedWaitMins)) {
+                      await prisma.order.updateMany({
+                        where: { id: orderId, estimatedReadyAt: order.estimatedReadyAt },
+                        data: { estimatedReadyAt: projected },
+                      });
+                      order = await prisma.order.findUnique({
+                        where: { id: orderId },
+                        select: ORDER_PUBLIC_FIELDS,
+                      });
+                    }
+                  }
+                } catch (etaError) {
+                  logger.error("ETA revision failed (non-fatal):", etaError);
+                }
+              }
+
+              if (order) {
+                const now = new Date();
+                sendEvent({
+                  type: "ORDER_UPDATE",
+                  ...order,
+                  etaMinutes:
+                    active && order.estimatedReadyAt
+                      ? remainingMins(order.estimatedReadyAt, now)
+                      : null,
+                  delayed: isDelayed(order.confirmedAt, order.estimatedWaitMins, order.estimatedReadyAt),
+                });
+
+                if (order.status === "COMPLETED" || order.status === "CANCELLED") {
+                  close();
+                }
               }
             }
           } else if (storeId) {
