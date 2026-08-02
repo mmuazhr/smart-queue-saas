@@ -157,6 +157,8 @@ export async function GET(request: NextRequest) {
                 }
               }
 
+              if (closed) return;
+
               if (order) {
                 const now = new Date();
                 sendEvent({
