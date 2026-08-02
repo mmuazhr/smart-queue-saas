@@ -27,6 +27,7 @@ export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaus
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+  const [waitMins, setWaitMins] = useState<number | null>(null);
 
   useEffect(() => {
     setStoreId(store.id);
@@ -39,6 +40,26 @@ export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaus
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [store.id, store.categories, setStoreId]);
+
+  // Live wait estimate — refreshed every 30s while the menu is open.
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchWait() {
+      try {
+        const res = await fetch(`/api/store-wait/${store.slug}`);
+        const json = await res.json();
+        if (!cancelled && json?.success) setWaitMins(json.data.waitMins);
+      } catch {
+        // chip silently keeps its last value
+      }
+    }
+    fetchWait();
+    const id = setInterval(fetchWait, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [store.slug]);
 
   const cartCount = getTotalItemsCount();
 
@@ -70,7 +91,8 @@ export default function StoreMenuClient({ store, isOpen, closedLabel, ordersPaus
                 {isOpen ? "Open Now" : "Currently Closed"}
               </span>
               <p className="text-xs text-white/70 flex items-center gap-1">
-                <Clock className="h-3 w-3" /> {store.avgPrepTimeMins} min prep
+                <Clock className="h-3 w-3" />{" "}
+                {waitMins != null ? `~${waitMins} min wait` : `${store.avgPrepTimeMins} min prep`}
               </p>
             </div>
           </div>
