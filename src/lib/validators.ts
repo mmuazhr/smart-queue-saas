@@ -50,7 +50,7 @@ export const createStoreSchema = z.object({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   avgPrepTimeMins: z.number().int().min(1).max(60).default(10),
-  maxConcurrentOrders: z.number().int().min(1).max(50).default(5),
+  maxConcurrentOrders: z.number().int().min(1).max(50).default(50),
   operatingHours: z
     .record(z.string(),
       z.object({
@@ -86,8 +86,15 @@ export const createStoreSchema = z.object({
 });
 
 // Emergency queue pause (dashboard toggle only — not part of store creation).
+// .partial() makes a field optional but keeps its default, so an update that
+// omits one would still write the default back. Callers that PUT a single key
+// (the dashboard's pause toggle sends only ordersPaused) must not reset the
+// merchant's queue settings, so the two defaulted fields are re-declared
+// without theirs.
 export const updateStoreSchema = createStoreSchema.partial().extend({
   ordersPaused: z.boolean().optional(),
+  avgPrepTimeMins: z.number().int().min(1).max(60).optional(),
+  maxConcurrentOrders: z.number().int().min(1).max(50).optional(),
 });
 
 // ---- Category Schemas ----

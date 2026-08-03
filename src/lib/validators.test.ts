@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   registerSchema,
   createStoreSchema,
+  updateStoreSchema,
   phoneSchema,
   createMenuItemSchema,
   updateMenuItemSchema,
@@ -49,6 +50,27 @@ describe("registerSchema optional phone", () => {
 describe("createStoreSchema optional phone", () => {
   it("accepts an empty-string phone", () => {
     expect(createStoreSchema.safeParse({ name: "My Stall", phone: "" }).success).toBe(true);
+  });
+});
+
+describe("store queue capacity", () => {
+  it("defaults a new store to the queue cap of 50", () => {
+    const parsed = createStoreSchema.parse({ name: "My Stall" });
+    expect(parsed.maxConcurrentOrders).toBe(50);
+  });
+
+  it("accepts a merchant-set cap of 50", () => {
+    expect(
+      createStoreSchema.safeParse({ name: "My Stall", maxConcurrentOrders: 50 }).success
+    ).toBe(true);
+  });
+
+  // An update that omits the field must leave the merchant's setting alone —
+  // .partial() has to drop the default, not re-apply it.
+  it("leaves the cap and prep time untouched when an update omits them", () => {
+    const parsed = updateStoreSchema.parse({ ordersPaused: true });
+    expect(parsed.maxConcurrentOrders).toBeUndefined();
+    expect(parsed.avgPrepTimeMins).toBeUndefined();
   });
 });
 

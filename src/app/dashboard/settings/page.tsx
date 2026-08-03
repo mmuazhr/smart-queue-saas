@@ -463,7 +463,7 @@ export default function SettingsPage() {
                 <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Max Concurrent Orders</label>
                 <div className="flex items-center gap-3">
                   <input
-                    type="range" min="1" max="20"
+                    type="range" min="1" max="50"
                     value={store.maxConcurrentOrders}
                     onChange={(e) => setStore({...store, maxConcurrentOrders: parseInt(e.target.value)})}
                     className="flex-1 accent-[var(--color-primary)]"

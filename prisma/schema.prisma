@@ -51,7 +51,7 @@ model Store {
   suspendedAt         DateTime? @map("suspended_at")
   ordersPaused        Boolean  @default(false) @map("orders_paused")
   avgPrepTimeMins     Int      @default(10) @map("avg_prep_time_mins")
-  maxConcurrentOrders Int      @default(5) @map("max_concurrent_orders")
+  maxConcurrentOrders Int      @default(50) @map("max_concurrent_orders")
   queueDelayMins      Int      @default(0) @map("queue_delay_mins")
   queueDelayReason    String?  @map("queue_delay_reason")
   operatingHours      Json?    @map("operating_hours")

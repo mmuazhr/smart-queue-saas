@@ -13,6 +13,7 @@ import {
   FROZEN_ORDER_CAP,
   firstAvailableMenuItemId,
 } from "@/lib/frozen";
+import { QUEUE_ACTIVE_STATUSES, isQueueFull } from "@/lib/capacity";
 import { quantityLimitViolation } from "@/lib/order-limits";
 import { toPlainOrder } from "@/lib/serializers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
         operatingHours: true,
         charges: true,
         ordersPaused: true,
+        maxConcurrentOrders: true,
         owner: { select: { frozenAt: true } },
       },
     });
@@ -163,6 +165,23 @@ export async function POST(request: NextRequest) {
           { status: 422 }
         );
       }
+    }
+
+    // Queue-full gate: the merchant's own maxConcurrentOrders setting is a
+    // real cap on how much work can be in flight, not just an ETA input. The
+    // frozen gate above keeps precedence — its cap is the stricter one.
+    const queueCount = await prisma.order.count({
+      where: { storeId, status: { in: [...QUEUE_ACTIVE_STATUSES] } },
+    });
+    if (isQueueFull(queueCount, store.maxConcurrentOrders)) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "QUEUE_FULL",
+          error: "This store's queue is full right now — please try again in a few minutes.",
+        },
+        { status: 422 }
+      );
     }
 
     const menuItemIds = items.map((item) => item.menuItemId);

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { QUEUE_ACTIVE_STATUSES, isQueueFull } from "@/lib/capacity";
 import { getStoreEtaContext } from "@/lib/eta-service";
 import { computeEtaMins } from "@/lib/eta";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -28,7 +29,7 @@ export async function GET(
   try {
     const store = await prisma.store.findUnique({
       where: { slug },
-      select: { id: true, status: true },
+      select: { id: true, status: true, maxConcurrentOrders: true },
     });
     if (!store || (store.status !== "ACTIVE" && store.status !== "CLOSED")) {
       return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
@@ -51,7 +52,15 @@ export async function GET(
       queueDelayMins: ctx.queueDelayMins,
     });
 
-    return NextResponse.json({ success: true, data: { waitMins } });
+    // Separate from ordersAhead: the cap counts unconfirmed orders too, while
+    // the ETA only counts work the kitchen has already taken on. Only the
+    // boolean is exposed — the raw count is the merchant's business.
+    const queueCount = await prisma.order.count({
+      where: { storeId: store.id, status: { in: [...QUEUE_ACTIVE_STATUSES] } },
+    });
+    const queueFull = isQueueFull(queueCount, store.maxConcurrentOrders);
+
+    return NextResponse.json({ success: true, data: { waitMins, queueFull } });
   } catch (error) {
     logger.error("Store wait error:", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });

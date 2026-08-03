@@ -27,6 +27,7 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
   const [paymentMethod, setPaymentMethod] = useState<"QR" | "CASH">("QR");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queueFull, setQueueFull] = useState(false);
 
   // Once an order is placed the cart is emptied on purpose — the empty-cart
   // guard below must not bounce the customer off the confirmation page.
@@ -47,6 +48,29 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
       router.push(`/store/${slug}`);
     }
   }, [isHydrated, items, router, slug]);
+
+  // The server rejects an order once the store hits its cap, so poll the same
+  // public signal the menu page uses and say so before the customer fills the
+  // form in. A failed poll leaves the last known answer alone.
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchQueueFull() {
+      try {
+        const res = await fetch(`/api/store-wait/${slug}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json?.success) setQueueFull(!!json.data.queueFull);
+      } catch {
+        // keep the last known state
+      }
+    }
+    fetchQueueFull();
+    const id = setInterval(fetchQueueFull, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [slug]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +116,7 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
         clearCart();
         router.push(`/store/${slug}/order/${data.data.orderId}`);
       } else {
+        if (data.code === "QUEUE_FULL") setQueueFull(true);
         setError(data.error || "Failed to place order. Please try again.");
       }
     } catch {
@@ -238,7 +263,13 @@ export default function CheckoutClient({ charges }: CheckoutClientProps) {
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting || limitViolations.length > 0}
+          {queueFull && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 text-sm">
+              This store&apos;s queue is full right now — you can place your order once it clears.
+            </div>
+          )}
+
+          <button type="submit" disabled={isSubmitting || limitViolations.length > 0 || queueFull}
             className="w-full py-4 rounded-2xl gradient-primary text-white font-black tracking-widest uppercase text-sm shadow-2xl shadow-orange-500/40 hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : (
               paymentMethod === "CASH"
