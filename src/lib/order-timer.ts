@@ -62,6 +62,9 @@ export function orderTimer(
     return { label, tone: remainingMins > 5 ? "green" : remainingMins >= 0 ? "yellow" : "red" };
   }
 
-  // No promise yet (typically unconfirmed): age alone is the signal.
-  return { label, tone: elapsedMins < 3 ? "green" : elapsedMins <= 7 ? "yellow" : "red" };
+  // No promise yet (typically unconfirmed): age alone is the signal, and it
+  // turns urgent fast — an unanswered order is the customer standing there
+  // wondering whether the shop saw it. Red past 3 minutes carries over the
+  // threshold the old age badge used before this chip replaced it.
+  return { label, tone: elapsedMins < 2 ? "green" : elapsedMins <= 3 ? "yellow" : "red" };
 }

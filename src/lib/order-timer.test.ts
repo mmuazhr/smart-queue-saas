@@ -1,6 +1,7 @@
 // Boundary convention under test: the green edge is strict (5.0 min on a READY
 // card is already yellow) and the yellow edge is inclusive (10.0 min is still
-// yellow, 10.1 is red). Same shape for the other two branches.
+// yellow, 10.1 is red). Same shape for the other two branches — an unconfirmed
+// card is yellow at exactly 2.0 and 3.0 min, red from 3.1.
 
 import { describe, it, expect } from "vitest";
 import { orderTimer } from "./order-timer";
@@ -95,17 +96,17 @@ describe("orderTimer tone — no ETA yet", () => {
     createdAt: minsBefore(mins),
   });
 
-  it("is green under 3 minutes", () => {
-    expect(orderTimer(waiting(2.9), NOW).tone).toBe("green");
+  it("is green under 2 minutes", () => {
+    expect(orderTimer(waiting(1.9), NOW).tone).toBe("green");
   });
 
-  it("is yellow from 3 through 7 minutes", () => {
+  it("is yellow from 2 through 3 minutes", () => {
+    expect(orderTimer(waiting(2), NOW).tone).toBe("yellow");
     expect(orderTimer(waiting(3), NOW).tone).toBe("yellow");
-    expect(orderTimer(waiting(7), NOW).tone).toBe("yellow");
   });
 
-  it("is red past 7 minutes", () => {
-    expect(orderTimer(waiting(7.5), NOW).tone).toBe("red");
+  it("is red past 3 minutes", () => {
+    expect(orderTimer(waiting(3.1), NOW).tone).toBe("red");
   });
 });
 

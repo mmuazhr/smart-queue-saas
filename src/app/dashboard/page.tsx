@@ -6,7 +6,6 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
-import { OrderAgeBadge } from "@/components/dashboard/OrderAgeBadge";
 import { orderTimer, type TimerTone } from "@/lib/order-timer";
 import { AlertTriangle, Clock } from "lucide-react";
 
@@ -68,7 +67,8 @@ export default function QueueDashboardPage() {
   const [delayBusy, setDelayBusy] = useState(false);
   const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const prevUnconfirmedCount = useRef(0);
+  const prevUnconfirmedCount = useRef<number | null>(null); // null until a real count has been seen
+  const ordersLoadedRef = useRef(false); // orders start empty; that 0 is "unknown", not "none waiting"
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -128,11 +128,8 @@ export default function QueueDashboardPage() {
       const res = await fetch(`/api/orders?storeId=${storeId}&status=AWAITING_CONFIRMATION,PAID,ACCEPTED,PREPARING,READY`);
       const data = await res.json();
       if (data.success) {
+        ordersLoadedRef.current = true;
         setOrders(data.data);
-        // Seed the baseline so page-load with pre-existing unconfirmed orders
-        // doesn't fire the "count rose" chime — the repeating interval (below)
-        // still picks them up on its own cadence.
-        prevUnconfirmedCount.current = data.data.filter((o: Order) => o.status === "AWAITING_CONFIRMATION").length;
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -172,6 +169,7 @@ export default function QueueDashboardPage() {
   // Handle Stream Updates
   useEffect(() => {
     if (streamData && streamData.type === "STORE_QUEUE_UPDATE") {
+      ordersLoadedRef.current = true;
       setOrders(streamData.orders as Order[]);
     }
   }, [streamData]);
@@ -181,8 +179,17 @@ export default function QueueDashboardPage() {
 
   // Rise chime: fires immediately whenever the unconfirmed count increases
   // (a new order arrived, or one dropped back in). Keyed on the raw count so
-  // every increase is caught, independent of the interval's own cadence.
+  // every increase is caught, independent of which path delivered the order —
+  // the stream, the fallback poll, or a manual Refresh. The first count from
+  // real data is only a baseline: page-load with pre-existing unconfirmed
+  // orders must not chime, and the repeating interval below still picks those
+  // up. The pre-load empty board is skipped outright — its 0 is not a count.
   useEffect(() => {
+    if (!ordersLoadedRef.current) return;
+    if (prevUnconfirmedCount.current === null) {
+      prevUnconfirmedCount.current = unconfirmedCount;
+      return;
+    }
     if (unconfirmedCount > prevUnconfirmedCount.current) {
       playNotificationSound();
     }
@@ -492,13 +499,9 @@ export default function QueueDashboardPage() {
                             );
                           })()}
                         </div>
-                        {col.key === "AWAITING_CONFIRMATION" ? (
-                          <OrderAgeBadge createdAt={order.createdAt} />
-                        ) : (
-                          <span className="text-xs text-[var(--color-text-muted)]">
-                            {formatRelativeTime(new Date(order.createdAt))}
-                          </span>
-                        )}
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          {formatRelativeTime(new Date(order.createdAt))}
+                        </span>
                       </div>
 
                       {/* Customer */}
