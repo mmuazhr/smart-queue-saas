@@ -7,7 +7,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { OrderAgeBadge } from "@/components/dashboard/OrderAgeBadge";
-import { AlertTriangle } from "lucide-react";
+import { orderTimer, type TimerTone } from "@/lib/order-timer";
+import { AlertTriangle, Clock } from "lucide-react";
 
 interface OrderItem {
   id: string;
@@ -30,6 +31,7 @@ interface Order {
   paymentMethod?: string;
   hasProof?: boolean;
   estimatedReadyAt?: string | null;
+  readyAt?: string | null;
   delayReason?: string | null;
 }
 
@@ -46,6 +48,12 @@ const COLUMNS = [
 
 const CHIME_REPEAT_MS = 20_000; // how often the alert replays while orders sit unconfirmed
 
+const TIMER_TONE_CLASSES: Record<TimerTone, string> = {
+  green: "text-green-500 bg-green-500/10",
+  yellow: "text-amber-500 bg-amber-500/10",
+  red: "text-red-500 bg-red-500/10",
+};
+
 import { useOrderStream } from "@/hooks/useOrderStream";
 
 export default function QueueDashboardPage() {
@@ -59,11 +67,18 @@ export default function QueueDashboardPage() {
   const [queueDelayMins, setQueueDelayMins] = useState(0);
   const [delayBusy, setDelayBusy] = useState(false);
   const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const prevUnconfirmedCount = useRef(0);
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: streamData, status: streamStatus } = useOrderStream(undefined, storeId || undefined);
+
+  // Drives the per-card timers and the ETA line — one tick for the whole board.
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Fetch store first
   useEffect(() => {
@@ -455,14 +470,27 @@ export default function QueueDashboardPage() {
                     >
                       {/* Queue Number */}
                       <div className="mb-3 flex items-start justify-between">
-                        <div
-                          className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold"
-                          style={{
-                            background: `${col.color}15`,
-                            color: col.color,
-                          }}
-                        >
-                          #{order.queueNumber || "—"}
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold"
+                            style={{
+                              background: `${col.color}15`,
+                              color: col.color,
+                            }}
+                          >
+                            #{order.queueNumber || "—"}
+                          </div>
+                          {(() => {
+                            const timer = orderTimer(order, new Date(nowMs));
+                            return (
+                              <span
+                                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${TIMER_TONE_CLASSES[timer.tone]}`}
+                              >
+                                <Clock className="h-3 w-3" />
+                                {timer.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                         {col.key === "AWAITING_CONFIRMATION" ? (
                           <OrderAgeBadge createdAt={order.createdAt} />
@@ -542,7 +570,7 @@ export default function QueueDashboardPage() {
                       {(col.key === "PAID" || col.key === "PREPARING") && (
                         <div className="mt-3 space-y-2">
                           {order.estimatedReadyAt && (() => {
-                            const msLeft = new Date(order.estimatedReadyAt).getTime() - Date.now();
+                            const msLeft = new Date(order.estimatedReadyAt).getTime() - nowMs;
                             const overdue = msLeft < 0;
                             const mins = Math.ceil(Math.abs(msLeft) / 60_000);
                             return (
