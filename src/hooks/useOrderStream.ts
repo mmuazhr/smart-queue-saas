@@ -65,7 +65,7 @@ export function useOrderStream(orderId?: string, storeId?: string) {
         es.close();
         // Only reconnect if the component is still mounted
         if (!isClosedRef.current) {
-          setTimeout(connect, 5000);
+          setTimeout(connect, 2000);
         }
       };
     };

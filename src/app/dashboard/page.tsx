@@ -63,7 +63,7 @@ export default function QueueDashboardPage() {
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: streamData } = useOrderStream(undefined, storeId || undefined);
+  const { data: streamData, status: streamStatus } = useOrderStream(undefined, storeId || undefined);
 
   // Fetch store first
   useEffect(() => {
@@ -126,6 +126,32 @@ export default function QueueDashboardPage() {
 
   useEffect(() => {
     if (storeId) fetchOrders();
+  }, [storeId, fetchOrders]);
+
+  // Fallback poll — SSE is the fast path, but a stream can die silently (its
+  // 15-minute lifetime, a backgrounded phone, a proxy dropping the connection)
+  // and the board would then sit stale until someone hit Refresh. Both paths
+  // replace `orders` wholesale from the same DB, so last write wins.
+  useEffect(() => {
+    if (!storeId) return;
+    const id = setInterval(fetchOrders, 10_000);
+    return () => clearInterval(id);
+  }, [storeId, fetchOrders]);
+
+  // A backgrounded tab throttles timers and drops the stream, so the board is
+  // usually stale the moment the merchant looks at it again — refetch on both
+  // the tab becoming visible and the window regaining focus.
+  useEffect(() => {
+    if (!storeId) return;
+    const refetchIfVisible = () => {
+      if (document.visibilityState === "visible") fetchOrders();
+    };
+    document.addEventListener("visibilitychange", refetchIfVisible);
+    window.addEventListener("focus", refetchIfVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refetchIfVisible);
+      window.removeEventListener("focus", refetchIfVisible);
+    };
   }, [storeId, fetchOrders]);
 
   // Handle Stream Updates
@@ -337,6 +363,17 @@ export default function QueueDashboardPage() {
           >
             {ordersPaused ? "Queue paused" : "Accepting orders"}
           </button>
+          <span
+            className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]"
+            aria-live="polite"
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                streamStatus === "connected" ? "bg-green-500" : "bg-amber-500 animate-pulse"
+              }`}
+            />
+            {streamStatus === "connected" ? "Live" : "Reconnecting…"}
+          </span>
           <button
             onClick={fetchOrders}
             className="rounded-lg border px-4 py-2 text-sm transition-colors hover:bg-[var(--color-bg-tertiary)]"
