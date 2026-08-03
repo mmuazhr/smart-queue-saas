@@ -67,8 +67,11 @@ export default function QueueDashboardPage() {
   const [delayBusy, setDelayBusy] = useState(false);
   const [expandedProofOrderId, setExpandedProofOrderId] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  // State, not a ref: the empty board's 0 is "unknown", not "none waiting", and
+  // the chime effect has to re-run the moment real data arrives — even when
+  // that data leaves the count at 0 and nothing else changes.
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   const prevUnconfirmedCount = useRef<number | null>(null); // null until a real count has been seen
-  const ordersLoadedRef = useRef(false); // orders start empty; that 0 is "unknown", not "none waiting"
   const chimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -128,7 +131,7 @@ export default function QueueDashboardPage() {
       const res = await fetch(`/api/orders?storeId=${storeId}&status=AWAITING_CONFIRMATION,PAID,ACCEPTED,PREPARING,READY`);
       const data = await res.json();
       if (data.success) {
-        ordersLoadedRef.current = true;
+        setOrdersLoaded(true);
         setOrders(data.data);
       }
     } catch (error) {
@@ -169,7 +172,7 @@ export default function QueueDashboardPage() {
   // Handle Stream Updates
   useEffect(() => {
     if (streamData && streamData.type === "STORE_QUEUE_UPDATE") {
-      ordersLoadedRef.current = true;
+      setOrdersLoaded(true);
       setOrders(streamData.orders as Order[]);
     }
   }, [streamData]);
@@ -185,7 +188,7 @@ export default function QueueDashboardPage() {
   // orders must not chime, and the repeating interval below still picks those
   // up. The pre-load empty board is skipped outright — its 0 is not a count.
   useEffect(() => {
-    if (!ordersLoadedRef.current) return;
+    if (!ordersLoaded) return;
     if (prevUnconfirmedCount.current === null) {
       prevUnconfirmedCount.current = unconfirmedCount;
       return;
@@ -194,7 +197,7 @@ export default function QueueDashboardPage() {
       playNotificationSound();
     }
     prevUnconfirmedCount.current = unconfirmedCount;
-  }, [unconfirmedCount]);
+  }, [unconfirmedCount, ordersLoaded]);
 
   // Repeating alert: replay every CHIME_REPEAT_MS while at least one order is
   // waiting. Keyed on the boolean hasUnconfirmed (not the raw count) so a
