@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { formatPrice, formatWaitTime } from "@/lib/utils";
 import {
   CheckCircle2, Clock, ChefHat, PackageCheck, AlertCircle,
-  ArrowLeft, MapPin, PhoneCall, Share2, RefreshCw, Banknote,
+  ArrowLeft, MapPin, PhoneCall, Share2, RefreshCw,
   Printer, Download, X,
 } from "lucide-react";
 import Link from "next/link";
@@ -152,9 +152,6 @@ export default function OrderTrackingPage() {
   // A queue number exists once the order is confirmed — the receipt should be
   // available from that point onward, not just once COMPLETED.
   const isConfirmed = !isAwaitingConfirmation && !isCancelled;
-  // The payment panel already covers "pay at counter" messaging while awaiting
-  // confirmation — showing this banner too would duplicate it.
-  const isCashPending = order.paymentMethod === "CASH" && order.paymentStatus === "PENDING" && !isAwaitingConfirmation;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] pb-12 animate-fade-in">
@@ -171,19 +168,6 @@ export default function OrderTrackingPage() {
       </div>
 
       <div className="max-w-md mx-auto px-6 py-8 space-y-8">
-        {/* Cash payment notice */}
-        {isCashPending && (
-          <div className="p-5 bg-green-500/10 border border-green-500/30 rounded-3xl flex items-start gap-4">
-            <Banknote className="h-8 w-8 text-green-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-black text-green-500">Pay at the Counter</p>
-              <p className="text-sm text-green-500/80 mt-1">
-                Please pay <span className="font-bold">{formatPrice(order.total)}</span> at the counter when you collect your order.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Friendly delay notice — appears once the promise has been revised */}
         {order.delayed && !isCancelled && !isCompleted && order.status !== "READY" && (
           <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-start gap-4 animate-fade-in">
