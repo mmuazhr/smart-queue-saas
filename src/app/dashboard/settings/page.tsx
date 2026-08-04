@@ -448,7 +448,7 @@ export default function SettingsPage() {
               Kitchen Parameters
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Avg. Prep Time (mins)</label>
                 <div className="flex items-center gap-3">
@@ -460,6 +460,9 @@ export default function SettingsPage() {
                   />
                   <span className="font-bold w-12 text-center">{store.avgPrepTimeMins}m</span>
                 </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
+                  Typical time to prepare a single order.
+                </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Max Concurrent Orders</label>
@@ -731,7 +734,7 @@ export default function SettingsPage() {
         </div>
 
         {/* QR Code Section */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
           <div className="glass rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
