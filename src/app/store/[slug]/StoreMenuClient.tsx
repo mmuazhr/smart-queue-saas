@@ -251,7 +251,7 @@ export default function StoreMenuClient({
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-sm z-[100] animate-bounce-in">
           <button
             onClick={() => setIsCartOpen(true)}
-            disabled={queueFull}
+            disabled={showQueueFullBanner}
             className="flex items-center justify-between w-full h-14 gradient-primary px-6 rounded-2xl text-white font-black shadow-2xl shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <div className="flex items-center gap-3">
@@ -262,7 +262,7 @@ export default function StoreMenuClient({
                 </span>
               </div>
               <span className="uppercase tracking-widest text-xs">
-                {queueFull ? "Queue Full — Please Wait" : "View My Cart"}
+                {showQueueFullBanner ? "Queue Full — Please Wait" : "View My Cart"}
               </span>
             </div>
             <div className="flex items-center gap-2">
