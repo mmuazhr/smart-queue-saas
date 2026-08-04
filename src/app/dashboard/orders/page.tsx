@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Filter, Calendar, ChevronRight, ChevronDown, CheckCircle2, XCircle, Clock, Package, MessageSquare } from "lucide-react";
 import { formatPrice, formatRelativeTime, displayOrderStatus } from "@/lib/utils";
+import Select from "@/components/shared/Select";
 
 interface OrderItem {
   id: string;
@@ -133,20 +134,24 @@ export default function OrderHistoryPage() {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] glass">
+          {/* Select carries its own border and background — the wrapper only
+              places the filter glyph beside it. */}
+          <div className="flex items-center gap-2">
             <Filter className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />
-            <select 
+            <Select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent text-sm font-medium outline-none"
-            >
-              <option value="ALL">All Status</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="READY">Ready</option>
-              <option value="PREPARING">Preparing</option>
-              <option value="PAID,ACCEPTED">Accepted</option>
-            </select>
+              onChange={setFilterStatus}
+              ariaLabel="Filter orders by status"
+              className="w-36"
+              options={[
+                { value: "ALL", label: "All Status" },
+                { value: "COMPLETED", label: "Completed" },
+                { value: "CANCELLED", label: "Cancelled" },
+                { value: "READY", label: "Ready" },
+                { value: "PREPARING", label: "Preparing" },
+                { value: "PAID,ACCEPTED", label: "Accepted" },
+              ]}
+            />
           </div>
           <button className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] glass text-sm font-medium hover:bg-[var(--color-bg-tertiary)] transition-all">
             <Calendar className="h-3.5 w-3.5" />

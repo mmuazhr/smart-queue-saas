@@ -6,6 +6,7 @@ import { Plus, Edit2, Trash2, Check, X, ChevronDown, ChevronUp, Image as ImageIc
 import { formatPrice, isHttpUrl } from "@/lib/utils";
 import { normalizeImageForUpload, mapUploadError, ImageDecodeError, IMAGE_DECODE_ERROR_MESSAGE } from "@/lib/client-image";
 import { menuItemLimitsError } from "@/lib/order-limits";
+import Select from "@/components/shared/Select";
 
 interface MenuItem {
   id: string;
@@ -472,14 +473,15 @@ export default function MenuManagementPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Category</label>
-                  <select 
-                    value={editingItem.categoryId || ""} 
-                    onChange={(e) => setEditingItem({...editingItem, categoryId: e.target.value || null})}
-                    className="w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm bg-[var(--color-bg-secondary)] text-[var(--color-text)] appearance-none cursor-pointer focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                  >
-                    <option value="">Uncategorized</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <Select
+                    value={editingItem.categoryId || ""}
+                    onChange={(value) => setEditingItem({...editingItem, categoryId: value || null})}
+                    ariaLabel="Category"
+                    options={[
+                      { value: "", label: "Uncategorized" },
+                      ...categories.map(c => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
