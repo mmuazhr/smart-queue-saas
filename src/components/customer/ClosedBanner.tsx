@@ -1,4 +1,4 @@
-import { Moon, PauseCircle } from "lucide-react";
+import { Moon, PauseCircle, Users } from "lucide-react";
 import { DEFAULT_TIMEZONE, type NextOpening } from "@/lib/store-hours";
 
 const DAY_LABELS: Record<string, string> = {
@@ -78,6 +78,24 @@ export function PausedBanner() {
         <p className="font-black text-[var(--color-text)] leading-tight">Temporarily not accepting orders</p>
         <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
           The shop has paused new orders for a moment. Please check back soon.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Queue at capacity — amber rather than the neutral shell above, because this
+// one clears on its own and the customer is being asked to wait, not leave.
+export function QueueFullBanner() {
+  return (
+    <div className="rounded-2xl px-5 py-4 flex items-center gap-4 bg-amber-500/10 border border-amber-500/30">
+      <div className="h-11 w-11 shrink-0 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-500">
+        <Users className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="font-black text-amber-500 leading-tight">Queue is full</p>
+        <p className="text-xs text-amber-500/80 mt-0.5">
+          This store&apos;s queue is full right now &mdash; you can place your order once it clears.
         </p>
       </div>
     </div>

@@ -6,7 +6,7 @@ import MenuCard from "@/components/customer/MenuCard";
 import CartDrawer from "@/components/customer/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { ShoppingBag, ChevronRight, MapPin, Clock, Info } from "lucide-react";
-import ClosedBanner, { PausedBanner } from "@/components/customer/ClosedBanner";
+import ClosedBanner, { PausedBanner, QueueFullBanner } from "@/components/customer/ClosedBanner";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { canPlaceOrder } from "@/lib/store-hours";
 
@@ -43,6 +43,10 @@ export default function StoreMenuClient({
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
   const [waitMins, setWaitMins] = useState<number | null>(null);
+  const [queueFull, setQueueFull] = useState(false);
+  // Same precedence as the pause banner: closed/paused already explains why
+  // ordering is off, so a full queue is only news while orders are allowed.
+  const showQueueFullBanner = orderingAllowed && queueFull;
 
   useEffect(() => {
     setStoreId(store.id);
@@ -56,14 +60,20 @@ export default function StoreMenuClient({
     return () => window.removeEventListener("scroll", handleScroll);
   }, [store.id, store.categories, setStoreId]);
 
-  // Live wait estimate — refreshed every 30s while the menu is open.
+  // Live wait estimate and queue-full state — refreshed every 30s while the
+  // menu is open, so the gate lifts on its own once the queue clears. A failed
+  // fetch leaves both alone: the POST route is the real gate, so the banner
+  // fails open rather than locking a customer out on a dropped request.
   useEffect(() => {
     let cancelled = false;
     async function fetchWait() {
       try {
         const res = await fetch(`/api/store-wait/${store.slug}`);
         const json = await res.json();
-        if (!cancelled && json?.success) setWaitMins(json.data.waitMins);
+        if (!cancelled && json?.success) {
+          setWaitMins(json.data.waitMins);
+          setQueueFull(!!json.data.queueFull);
+        }
       } catch {
         // chip silently keeps its last value
       }
@@ -129,6 +139,14 @@ export default function StoreMenuClient({
       {showPausedBanner && (
         <div className="px-6 pt-4">
           <PausedBanner />
+        </div>
+      )}
+
+      {/* Queue at capacity — only worth saying while the store is otherwise
+          taking orders; closed/paused already explains why ordering is off. */}
+      {showQueueFullBanner && (
+        <div className="px-6 pt-4">
+          <QueueFullBanner />
         </div>
       )}
 
@@ -233,7 +251,8 @@ export default function StoreMenuClient({
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-sm z-[100] animate-bounce-in">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="flex items-center justify-between w-full h-14 gradient-primary px-6 rounded-2xl text-white font-black shadow-2xl shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            disabled={queueFull}
+            className="flex items-center justify-between w-full h-14 gradient-primary px-6 rounded-2xl text-white font-black shadow-2xl shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -242,7 +261,9 @@ export default function StoreMenuClient({
                   {cartCount}
                 </span>
               </div>
-              <span className="uppercase tracking-widest text-xs">View My Cart</span>
+              <span className="uppercase tracking-widest text-xs">
+                {queueFull ? "Queue Full — Please Wait" : "View My Cart"}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <ChevronRight className="h-5 w-5" />
