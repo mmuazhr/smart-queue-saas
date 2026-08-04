@@ -35,6 +35,16 @@ jobs:
 
       - name: Test + coverage
         run: npm run test:coverage
+        env:
+          # Placeholder values so modules that construct a Prisma/Supabase
+          # client at import time (e.g. src/lib/frozen.ts -> prisma.ts) don't
+          # throw during test collection. No live services are contacted.
+          # Real secrets are injected by the deploy platform (Railway), never CI.
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+          NEXTAUTH_SECRET: "ci-placeholder-secret-not-used-at-runtime"
+          NEXTAUTH_URL: "http://localhost:3000"
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
 
       - name: Build
         run: npm run build
