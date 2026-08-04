@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# QueLess — Smart Queue SaaS
 
-## Getting Started
+Digital queue management for food & retail merchants: customers scan a QR
+code, join the queue or order ahead, and track their live position — no app
+install. Merchants run everything from a dashboard: menu, orders, queue
+capacity, and payment confirmation.
 
-First, run the development server:
+Live at [queless-production.up.railway.app](https://queless-production.up.railway.app).
+
+## Tech stack
+
+Next.js 15 (App Router) · TypeScript · Prisma + PostgreSQL (Supabase) ·
+NextAuth.js v5 · Tailwind · Zustand · Vitest · Sentry · deployed on Railway.
+
+## How payment works
+
+QueLess never touches customer money. Each merchant connects their own bank
+account via a DuitNow QR code (Settings → Payments & Charges), configures up
+to 5 flat charges (e.g. SST, service charge), and customers pay by scanning
+that QR in their own banking app, then upload a screenshot as proof. Orders
+sit in an "Unconfirmed" column until the merchant confirms the payment — the
+customer's queue number is issued only after confirmation. Cash orders go
+through the same confirm gate. Order lifecycle: confirmed → accepted →
+preparing → ready → completed.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env` (see `src/lib/config.ts` / `prisma/schema.prisma` for the full
+list) with at minimum:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL`, `DIRECT_URL` | Postgres (Supabase) connection |
+| `AUTH_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | NextAuth session |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client (storage, realtime) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then:
 
-## Learn More
+```bash
+npx prisma generate && npx prisma migrate deploy
+npm run dev          # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Purpose |
+|---|---|
+| `npm run dev` / `build` / `start` | Dev server / production build / serve |
+| `npm test` / `npm run test:coverage` | Vitest unit tests |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+Railway (`railway.json`): Nixpacks build, `npm run start`, health check on
+`/api/health`. Real secrets are injected by Railway — CI only ever sees
+placeholder values (see `.github/workflows/ci.yml`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├─ app/
+│  ├─ store/[slug]/    customer-facing menu, checkout, order tracking
+│  ├─ dashboard/        merchant queue/order management
+│  ├─ admin/            platform admin
+│  ├─ (auth)/           login/register
+│  └─ api/              route handlers
+├─ lib/                 domain logic: eta.ts, capacity.ts, order-timer.ts, ...
+└─ components/
+prisma/                 schema + migrations
+docs/                   specs, plans, audits
+```
+
+## Tests
+
+```bash
+npm test              # unit tests (Vitest)
+npm run test:coverage # with coverage
+```
+
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, tests, and a production
+build on every push to `main`.
