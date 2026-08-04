@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatPrice, formatWaitTime } from "@/lib/utils";
 import {
   CheckCircle2, Clock, ChefHat, PackageCheck, AlertCircle,
@@ -53,6 +53,12 @@ interface InstallPromptEvent extends Event {
 
 const PWA_NUDGE_KEY = "queless-pwa-nudge-dismissed";
 
+// Same short chime the dashboard plays for a new order (it keeps its own copy).
+const READY_CHIME = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Mj4yCe3J5goWDf3Z5eoGJiYh/d3R6goeIh4F4d3uDi4uIgXh1eYCFhYF8eHyDi4yKhH16fYGEhYKAfn+DiI2NioSDgIGChIWEhIODhImNjouHhIOBgYGBgoKDhYiMjo6Lh4SDgH9/f3+Bg4eKjY6Ni4iFgn9+fn5+gIOGioyNjIqIhYJ/fXx8fX+ChYiLjI2LiYaEgX5+fn5/gYSHiouLi4mHhIJ/fn19fn+BhIeKi4uLiYeEgn9+fX1+gIKFiIqLi4qIhoSBf359fX+Ag4aIiouLioiGhIF/fn19f4GDhoiKi4uKiIaEgX9+fX1/gYOGiIqLi4qIhoSBf359fX+Bg4aIiouLioiGhIF/fn19f4GDhoiKi4qKiIaEgX9+fX5/gYOGiIqLi4qIhoSBf359fn+Bg4aIiouLioiGhIF/fn19f4GDhoiKi4uKiIaEgX9+fX5/gYOGiIqLi4qIhoSBf359fn+Bg4aIiouLioiGhIF/fn19f4GDhoiKi4qKiIaEgX9+fX5/gYOGiIqLi4qIhoSBf359fn+Bg4aIiouLioiGhIF/fn19";
+
+/** Statuses where the order is live and the customer is waiting for pickup. */
+const PRE_READY_ACTIVE_STATUSES = ["PAID", "ACCEPTED", "PREPARING"];
+
 export default function OrderTrackingPage() {
   const { slug, orderId } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
@@ -61,6 +67,11 @@ export default function OrderTrackingPage() {
 
   const [showPwaNudge, setShowPwaNudge] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+
+  const status = order?.status ?? null;
+  const previousStatusRef = useRef<string | null>(null); // null until a real status has been seen
+  const permissionAskedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: streamData } = useOrderStream(orderId as string);
 
@@ -122,6 +133,40 @@ export default function OrderTrackingPage() {
     }
   }, [streamData]);
 
+  // Ask once, and only while the customer is actually waiting on food — a
+  // permission prompt before the shop has even confirmed the order is noise.
+  // Anything other than "default" (already granted, or denied) is left alone.
+  useEffect(() => {
+    if (permissionAskedRef.current) return;
+    if (!status || !PRE_READY_ACTIVE_STATUSES.includes(status)) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+    permissionAskedRef.current = true;
+    Notification.requestPermission().catch(() => {/* dismissed or unsupported */});
+  }, [status]);
+
+  // Alert on an observed transition into READY only. The first status this
+  // session is a baseline, never an event: a page opened on an already-ready
+  // order shows the banner but must not chime at someone mid-collection.
+  useEffect(() => {
+    if (!status) return;
+    const previous = previousStatusRef.current;
+    previousStatusRef.current = status;
+    if (previous === null || previous === status || status !== "READY") return;
+
+    try {
+      if (!audioRef.current) audioRef.current = new Audio(READY_CHIME);
+      audioRef.current.play().catch(() => {/* autoplay blocked */});
+    } catch {/* ignore */}
+    navigator.vibrate?.([200, 100, 200]);
+
+    // Only worth a system notification when the customer is looking elsewhere.
+    if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        new Notification("Your order is ready!", { body: "Collect it at the counter." });
+      } catch {/* some browsers only allow this from a service worker */}
+    }
+  }, [status]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center animate-pulse-glow">Tracking your order...</div>;
   if (error || !order) return (
     <div className="min-h-screen flex items-center justify-center p-6 text-center">
@@ -168,6 +213,18 @@ export default function OrderTrackingPage() {
       </div>
 
       <div className="max-w-md mx-auto px-6 py-8 space-y-8">
+        {/* Ready alert — shown whenever the order is ready, including on a page
+            opened after the fact; only the chime is gated on the transition. */}
+        {order.status === "READY" && (
+          <div className="p-5 bg-green-500/10 border border-green-500/30 rounded-3xl flex items-center gap-4 animate-fade-in">
+            <PackageCheck className="h-9 w-9 text-green-500 shrink-0" />
+            <div>
+              <p className="font-black text-green-500 text-lg leading-tight">Your order is ready!</p>
+              <p className="text-sm text-green-500/80 mt-0.5">Collect it at the counter.</p>
+            </div>
+          </div>
+        )}
+
         {/* Friendly delay notice — appears once the promise has been revised */}
         {order.delayed && !isCancelled && !isCompleted && order.status !== "READY" && (
           <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-start gap-4 animate-fade-in">
