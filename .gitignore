@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Cloudflare Workers local secrets
+.dev.vars
+.dev.vars.*
+
 # vercel
 .vercel
 
@@ -48,3 +52,16 @@ next-env.d.ts
 # tool caches
 /.understand-anything/
 .gstack/
+.claude/
+.superpowers/
+
+# OpenNext / Cloudflare build output
+.open-next/
+.wrangler/
+
+# git worktrees checked out inside the repo
+.worktrees/
+
+# Supabase CLI local link state
+supabase/.temp/
+supabase/.branches/
