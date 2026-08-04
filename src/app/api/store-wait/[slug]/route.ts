@@ -29,7 +29,7 @@ export async function GET(
   try {
     const store = await prisma.store.findUnique({
       where: { slug },
-      select: { id: true, status: true, maxConcurrentOrders: true },
+      select: { id: true, status: true, maxActiveOrders: true },
     });
     if (!store || (store.status !== "ACTIVE" && store.status !== "CLOSED")) {
       return NextResponse.json({ success: false, error: "Store not found" }, { status: 404 });
@@ -58,7 +58,7 @@ export async function GET(
     const queueCount = await prisma.order.count({
       where: { storeId: store.id, status: { in: [...QUEUE_ACTIVE_STATUSES] } },
     });
-    const queueFull = isQueueFull(queueCount, store.maxConcurrentOrders);
+    const queueFull = isQueueFull(queueCount, store.maxActiveOrders);
 
     return NextResponse.json({ success: true, data: { waitMins, queueFull } });
   } catch (error) {

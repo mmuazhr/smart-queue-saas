@@ -47,6 +47,7 @@ interface Store {
   phone: string | null;
   avgPrepTimeMins: number;
   maxConcurrentOrders: number;
+  maxActiveOrders: number;
   status: string;
   operatingHours: OperatingHours | null;
   paymentQrUrl: string | null;
@@ -162,6 +163,7 @@ export default function SettingsPage() {
           phone: store.phone ?? "",
           avgPrepTimeMins: store.avgPrepTimeMins,
           maxConcurrentOrders: store.maxConcurrentOrders,
+          maxActiveOrders: store.maxActiveOrders,
         }),
       });
       const data = await res.json();
@@ -463,13 +465,31 @@ export default function SettingsPage() {
                 <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Max Concurrent Orders</label>
                 <div className="flex items-center gap-3">
                   <input
-                    type="range" min="1" max="50"
+                    type="range" min="1" max="20"
                     value={store.maxConcurrentOrders}
                     onChange={(e) => setStore({...store, maxConcurrentOrders: parseInt(e.target.value)})}
                     className="flex-1 accent-[var(--color-primary)]"
                   />
                   <span className="font-bold w-12 text-center">{store.maxConcurrentOrders}</span>
                 </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
+                  How many orders your kitchen prepares at the same time — drives wait-time estimates.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[var(--color-text-secondary)] mb-1.5 block">Max Active Orders</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range" min="1" max="100"
+                    value={store.maxActiveOrders}
+                    onChange={(e) => setStore({...store, maxActiveOrders: parseInt(e.target.value)})}
+                    className="flex-1 accent-[var(--color-primary)]"
+                  />
+                  <span className="font-bold w-12 text-center">{store.maxActiveOrders}</span>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
+                  Total orders allowed in the queue at once. New customers can&apos;t order while it&apos;s full.
+                </p>
               </div>
             </div>
 

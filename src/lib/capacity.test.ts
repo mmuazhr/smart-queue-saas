@@ -26,6 +26,12 @@ describe("isQueueFull", () => {
     expect(isQueueFull(49, 50)).toBe(false);
   });
 
+  // The cap passed here is maxActiveOrders (queue size), never the much
+  // smaller maxConcurrentOrders the ETA maths uses.
+  it("is not full at the concurrency setting's worth of orders", () => {
+    expect(isQueueFull(6, 50)).toBe(false);
+  });
+
   it("is full at exactly the cap", () => {
     expect(isQueueFull(50, 50)).toBe(true);
   });

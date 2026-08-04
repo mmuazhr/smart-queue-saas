@@ -54,22 +54,31 @@ describe("createStoreSchema optional phone", () => {
 });
 
 describe("store queue capacity", () => {
-  it("defaults a new store to the queue cap of 50", () => {
+  // Two separate settings: concurrency feeds the ETA maths, the active cap is
+  // the queue-full gate. A new store cooks 5 at a time and holds 50 in queue.
+  it("defaults a new store to 5 concurrent and 50 active orders", () => {
     const parsed = createStoreSchema.parse({ name: "My Stall" });
-    expect(parsed.maxConcurrentOrders).toBe(50);
+    expect(parsed.maxConcurrentOrders).toBe(5);
+    expect(parsed.maxActiveOrders).toBe(50);
   });
 
-  it("accepts a merchant-set cap of 50", () => {
+  it("accepts a merchant-set queue cap up to 100", () => {
     expect(
-      createStoreSchema.safeParse({ name: "My Stall", maxConcurrentOrders: 50 }).success
+      createStoreSchema.safeParse({ name: "My Stall", maxActiveOrders: 100 }).success
     ).toBe(true);
+  });
+
+  it("rejects a queue cap past 100 or below 1", () => {
+    expect(createStoreSchema.safeParse({ name: "My Stall", maxActiveOrders: 101 }).success).toBe(false);
+    expect(createStoreSchema.safeParse({ name: "My Stall", maxActiveOrders: 0 }).success).toBe(false);
   });
 
   // An update that omits the field must leave the merchant's setting alone —
   // .partial() has to drop the default, not re-apply it.
-  it("leaves the cap and prep time untouched when an update omits them", () => {
+  it("leaves both caps and prep time untouched when an update omits them", () => {
     const parsed = updateStoreSchema.parse({ ordersPaused: true });
     expect(parsed.maxConcurrentOrders).toBeUndefined();
+    expect(parsed.maxActiveOrders).toBeUndefined();
     expect(parsed.avgPrepTimeMins).toBeUndefined();
   });
 });

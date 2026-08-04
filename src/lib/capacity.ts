@@ -1,6 +1,6 @@
 // =============================================================================
 // Queue capacity — how full a store's queue is against its own
-// maxConcurrentOrders setting.
+// maxActiveOrders setting.
 // =============================================================================
 // Unconfirmed orders count here (unlike FROZEN_ACTIVE_ORDER_STATUSES, which
 // measures work the merchant has actually taken on): a queue that is full of
@@ -15,7 +15,7 @@ export const QUEUE_ACTIVE_STATUSES = [
   "PREPARING",
 ] as const;
 
-/** The cap is inclusive: a store at exactly maxConcurrentOrders takes no more. */
-export function isQueueFull(activeCount: number, maxConcurrentOrders: number): boolean {
-  return activeCount >= maxConcurrentOrders;
+/** The cap is inclusive: a store at exactly maxActiveOrders takes no more. */
+export function isQueueFull(activeCount: number, maxActiveOrders: number): boolean {
+  return activeCount >= maxActiveOrders;
 }

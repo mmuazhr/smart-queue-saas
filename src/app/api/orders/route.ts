@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         operatingHours: true,
         charges: true,
         ordersPaused: true,
-        maxConcurrentOrders: true,
+        maxActiveOrders: true,
         owner: { select: { frozenAt: true } },
       },
     });
@@ -167,13 +167,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Queue-full gate: the merchant's own maxConcurrentOrders setting is a
-    // real cap on how much work can be in flight, not just an ETA input. The
-    // frozen gate above keeps precedence — its cap is the stricter one.
+    // Queue-full gate: the merchant's own maxActiveOrders setting caps how
+    // many orders the queue will hold at once (maxConcurrentOrders is the
+    // separate, much smaller ETA input). The frozen gate above keeps
+    // precedence — its cap is the stricter one.
     const queueCount = await prisma.order.count({
       where: { storeId, status: { in: [...QUEUE_ACTIVE_STATUSES] } },
     });
-    if (isQueueFull(queueCount, store.maxConcurrentOrders)) {
+    if (isQueueFull(queueCount, store.maxActiveOrders)) {
       return NextResponse.json(
         {
           success: false,
